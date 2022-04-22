@@ -10,7 +10,6 @@ library(ggpubr)
 library(readxl)
 library(stringi)
 library(stringr)
-source("R/functions.R")
 
 # Loading and Formatting the data -----------------------------------------
 
@@ -22,27 +21,6 @@ death_count_day <- read.csv("data/death_count_prov_day.csv",
     )
   ) %>% 
   tibble()
-
-# Human Development Index
-idh <- read_excel("data/IDH%202019.xlsx", sheet = 3, skip = 2, n_max = 199) %>% 
-  clean_names() %>% 
-  select(
-    ubigeo,
-    provincia = x3, 
-    pop = poblacion, 
-    idh = indice_de_desarrollo_humano,
-    life_exp = esperanza_de_vida_al_nacer,
-    perc_secondary = con_educacion_secundaria_completa_poblac_18_anos,
-    education_years = anos_de_educacion_poblac_25_y_mas,
-    household_per_capita_income = ingreso_familiar_per_capita
-    ) %>% 
-  na.omit() %>% 
-  mutate(
-    provincia = str_to_upper(
-      stri_trans_general(provincia, id = "Latin-ASCII")
-    )
-  ) %>% 
-  mutate_at(vars(3:8), ~as.numeric(.))
 
 # Province level population
 poblacion_prov <- read.csv("data/poblacion_provincial_peru.csv") %>% 
@@ -111,10 +89,12 @@ data_prov <- death_count_day %>%
   
 # Baseline Province level data y1 = 0
 province_baseline <- map(
-  .x = list(-5,-4,-3,-2,-1),
-  .f = ~ unique(data_prov[c("dpt_cdc","prov_cdc", "pob")]) %>% 
+  .x = list(-3,-2,-1),
+  .f = ~ data_prov %>% 
+    group_by(dpt_cdc, prov_cdc, pob) %>% 
+    summarize(x1 = min(x1)) %>% 
     mutate(
-      x1 = .x,
+      x1 = x1 + .x,
       y1 = 0,
       ylog = log(0 + 0.0000001),
       n = 0,
@@ -129,99 +109,9 @@ data_prov <- data_prov %>%
   arrange(dpt_cdc, prov_cdc, pob, x1) %>% 
   mutate(
     id = row_number(),
-    x1 = x1 +5
+    x1 = x1 +3
   )
 
-# Splines DPTO ---------------------------------------------------------------
-
-dpto_mrbrt <- MRData() 
-dpto_mrbrt$load_df(
-  data = data_dpt,  
-  col_obs = "ylog", 
-  col_obs_se = "sd",
-  col_covs = list("x1"), 
-  col_study_id = "id" 
-  )
-
-
-mod_dpto <- MRBRT(
-  data = dpto_mrbrt,
-  cov_models = list(
-    LinearCovModel("intercept", use_re = TRUE),
-    LinearCovModel(
-      alt_cov = "x1",
-      use_spline = TRUE,
-      # spline_knots = array(c(0, 0.25, 0.5, 0.75, 1)),
-      spline_knots = array(seq(0.05, 1, by = 0.05)),
-      spline_degree = 3L,
-      spline_knots_type = 'frequency',
-      # spline_r_linear = FALSE,
-      spline_l_linear = TRUE
-      # prior_spline_monotonicity = 'increasing',
-      # prior_spline_convexity = "convex"
-      # prior_spline_maxder_gaussian = array(c(0, 0.01))
-      # prior_spline_maxder_gaussian = rbind(c(0,0,0,0,-1), c(Inf,Inf,Inf,Inf,0.0001))
-    )
-  )
-)
-
-mod_dpto$fit_model(inner_print_level = 5L, inner_max_iter = 10000L)
-
-df_pred <- data.frame(x1 = seq(0, 80, by = 0.1))
-
-dat_pred_dpto <- MRData()
-dat_pred_dpto$load_df(
-  data = df_pred, 
-  col_covs = list('x1')
-)
-
-pred_dpto <- mod_dpto$predict(data = dat_pred_dpto)
-
-ggplot(data_dpt) +
-  geom_point(aes(x = x1, y = y1 * 100000), alpha = 0.3, size = 0.3) +
-  geom_line(data = df_pred, aes(x = x1, y = exp(pred_dpto) * 100000)) +
-  ylim(c(0, 30)) +
-  labs(x = "Week", y = "Mortality per 100,000") +
-  theme_bw()
-
-
-# Cascade splines DPTO --------------------------------------------------------
-
-mod_spline_dpto <- run_spline_cascade(
-  stage1_model_object = mod_dpto,
-  df = data_dpt,
-  col_obs = "ylog",
-  col_obs_se = "sd",
-  col_study_id = "id",
-  stage_id_vars = "dpt_cdc",
-  thetas = 5,
-  output_dir = "output/",
-  model_label = "mbrt_cascade_dpto_peru",
-  overwrite_previous = TRUE
-)
-
-df_pred <- expand.grid(
-  stringsAsFactors = FALSE,
-  x1 = seq(0, 80, by = 0.1),
-  dpt_cdc = unique(data_dpt$dpt_cdc)
-  ) %>%
-  mutate(data_id = 1:nrow(.)) 
-
-pred_cascade_dpto <- predict_spline_cascade(
-  fit = mod_spline_dpto,
-  newdata = df_pred
-  ) %>% 
-  left_join(data_dpt)
-
-ggplot(data = pred_cascade_dpto) +
-  geom_line(aes(x = x1, y = exp(pred) * 100000)) +
-  geom_point(aes(x = x1, y = y1 * 100000), size = 0.1, alpha = 0.5) +
-  facet_wrap(.~dpt_cdc) +
-  labs(x = "Week", y = "Mortality per 100,000") +
-  ylim(c(0,80)) +
-  theme_bw()
-
-ggsave("plots/departments.png", scale = 3)
 
 # Splines Prov ---------------------------------------------------------------
 
@@ -243,7 +133,7 @@ mod_prov <- MRBRT(
       alt_cov = "x1",
       use_spline = TRUE,
       # spline_knots = array(c(0, 0.25, 0.5, 0.75, 1)),
-      spline_knots = array(seq(0, 1, by = 0.08)),
+      spline_knots = array(c(seq(0, 1, by = 0.08), 1)),
       spline_degree = 3L,
       spline_knots_type = 'frequency',
       # spline_r_linear = FALSE,
@@ -286,7 +176,7 @@ mod_spline_dpto2 <- run_spline_cascade(
   col_obs_se = "sd",
   col_study_id = "id",
   stage_id_vars = "dpt_cdc",
-  thetas = 5,
+  thetas = 10,
   output_dir = "output/",
   model_label = "mbrt_cascade_dpto2_peru",
   overwrite_previous = TRUE
@@ -294,7 +184,7 @@ mod_spline_dpto2 <- run_spline_cascade(
 
 df_pred <- expand.grid(
   stringsAsFactors = FALSE,
-  x1 = seq(0, 85, by = 0.1),
+  x1 = seq(0, 80, by = 0.1),
   dpt_cdc = unique(data_dpt$dpt_cdc)
   ) %>%
   mutate(data_id = 1:nrow(.)) 
@@ -311,7 +201,7 @@ ggplot(data = pred_cascade_dpto2) +
   facet_wrap(.~dpt_cdc) +
   labs(x = "Week", y = "Mortality per 100,000") +
   ylim(c(0,60)) +
-  goldenScatterCAtheme
+  theme_bw()
 
 # Cascade splines Prov --------------------------------------------------------
 
@@ -322,7 +212,7 @@ mod_spline_prov <- run_spline_cascade(
   col_obs_se = "sd",
   col_study_id = "id",
   stage_id_vars = c("dpt_cdc", "prov_cdc"),
-  thetas = c(5,5),
+  thetas = c(5,10),
   output_dir = "output/",
   model_label = "mbrt_cascade_peru_prov",
   overwrite_previous = TRUE
@@ -331,7 +221,7 @@ mod_spline_prov <- run_spline_cascade(
 # Prediction Provinces
 df_pred <- expand.grid(
   stringsAsFactors = FALSE,
-  x1 = seq(0, 85, by = 0.1),
+  x1 = seq(0, 80, by = 0.1),
   prov_cdc = unique(data_prov$prov_cdc)
   ) %>%
   mutate(
@@ -382,8 +272,9 @@ for (i in depts) {
   
   print(graph)
   
-  ggsave(plot = graph, filename =  paste0("plots/", i, ".png"), scale = 2)
+  ggsave(plot = graph, filename =  paste0("plots/no_dummy/",i, ".png"), scale = 2)
 }
+
 
 prov_time_series <- predict_spline_cascade(
   fit = mod_spline_prov,
