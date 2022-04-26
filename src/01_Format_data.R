@@ -272,7 +272,7 @@ for (i in depts) {
   
   print(graph)
   
-  ggsave(plot = graph, filename =  paste0("plots/no_dummy/",i, ".png"), scale = 2)
+  ggsave(plot = graph, filename =  paste0("plots/",i, ".png"), scale = 2)
 }
 
 
