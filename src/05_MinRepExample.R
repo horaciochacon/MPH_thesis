@@ -113,7 +113,7 @@ mod_prov <- MRBRT(
 
 mod_prov$fit_model(inner_print_level = 5L, inner_max_iter = 10000L)
 
-df_pred <- data.frame(x1 = seq(0, 80, by = 0.1))
+df_pred <- data.frame(x1 = seq(0, 85, by = 0.1))
 
 dat_pred_prov <- MRData()
 dat_pred_prov$load_df(
@@ -131,7 +131,7 @@ ggplot(data_prov) +
 
 # Cascade splines Dep with Prov data -----------------------------------------
 
-mod_spline_dpto2 <- run_spline_cascade(
+mod_spline_dpto <- run_spline_cascade(
   stage1_model_object = mod_prov,
   df = data_prov,
   col_obs = "ylog",
@@ -146,18 +146,18 @@ mod_spline_dpto2 <- run_spline_cascade(
 
 df_pred <- expand.grid(
   stringsAsFactors = FALSE,
-  x1 = seq(0, 80, by = 0.1),
+  x1 = seq(0, 85, by = 0.1),
   dpt_cdc = unique(data_prov$dpt_cdc)
   ) %>%
   mutate(data_id = 1:nrow(.)) 
 
-pred_cascade_dpto2 <- predict_spline_cascade(
-  fit = mod_spline_dpto2,
+pred_cascade_dpto <- predict_spline_cascade(
+  fit = mod_spline_dpto,
   newdata = df_pred
   ) %>% 
   left_join(data_prov)
 
-ggplot(data = pred_cascade_dpto2) +
+ggplot(data = pred_cascade_dpto) +
   geom_line(aes(x = x1, y = exp(pred) * 100000)) +
   geom_point(aes(x = x1, y = y1 * 100000), size = 0.1, alpha = 0.5) +
   facet_wrap(.~dpt_cdc) +
@@ -198,7 +198,7 @@ depts <- unique(data_prov$dpt_cdc)
 
 for (i in depts) {
   
-  graph_dpto <- pred_cascade_dpto2 %>% 
+  graph_dpto <- pred_cascade_dpto %>% 
     filter(dpt_cdc == i) %>% 
     ggplot() +
     geom_line(aes(x = x1, y = exp(pred) * 100000)) +
@@ -209,7 +209,7 @@ for (i in depts) {
       alpha = 0.4
     ) +
     facet_wrap(.~dpt_cdc) +
-    labs(x = "Week", y = "Mortality per 100,000") +
+    labs(x = NULL, y = "Mortality per 100,000") +
     theme_bw()
   
   graph_prov <- preds_cascade_prov %>% 
