@@ -7,6 +7,7 @@ library(reticulate)
 use_condaenv("mrtool-0.0.1")
 library(mrtoolr)
 library(ggpubr)
+library(cowplot)
 
 # Loading and Formatting the data -----------------------------------------
 
@@ -56,6 +57,7 @@ province_baseline <- purrr:::map(
     summarize(x1 = min(x1)) %>%
     mutate(
       x1 = x1 + .x,
+      # x1 = 0 + .x,
       y1 = 0,
       ylog = log(0 + 0.0000001),
       n = 0,
@@ -203,8 +205,8 @@ for (i in depts) {
     geom_point(
       data = data_prov  %>% filter(dpt_cdc == i), 
       aes(x = x1, y = y1 * 100000), 
-      size = 1, 
-      alpha = 0.5
+      size = 0.7, 
+      alpha = 0.4
     ) +
     facet_wrap(.~dpt_cdc) +
     labs(x = "Week", y = "Mortality per 100,000") +
@@ -219,13 +221,9 @@ for (i in depts) {
     labs(x = "Week", y = "Mortality per 100,000") +
     theme_bw() 
   
-  graph <- ggarrange(
-    graph_dpto,
-    graph_prov, 
-    nrow = 2,
-    heights = c(2, 5), 
-    widths = c(0.5,5)
-  )
+  graph <-  ggdraw() +
+    draw_plot(graph_dpto, x = 0.25, y = .7, width = .5, height = .3) +
+    draw_plot(graph_prov, x = 0, y = 0, width = 1, height = 0.7) 
   
   print(graph)
   
