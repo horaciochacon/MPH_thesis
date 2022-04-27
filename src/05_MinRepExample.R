@@ -42,8 +42,8 @@ data_prov <- death_count_day %>%
     y1 = n / pob,
     ylog = log(y1 + 0.0000001),
     x1 = (as.numeric(fecha_fallecimiento) - 18323) / 7,
-    sd = 1
-    # sd = sqrt(1 / y1)
+    # sd = 1
+    sd = log(sqrt(1 / (y1 + 0.0000001)))
     # sd = log(sqrt(1 / y1))
   ) %>% 
   na.omit() %>% 
@@ -61,9 +61,9 @@ province_baseline <- purrr:::map(
       y1 = 0,
       ylog = log(0 + 0.0000001),
       n = 0,
-      sd = 1
+      # sd = 1
       # sd = log(sqrt(1 / (y1 + 0.0000001)))
-      # sd = sqrt(1 / (y1 + 0.0000001))
+      sd = log(sqrt(1 / (y1 + 0.0000001)))
     )
   ) %>%
   bind_rows()
@@ -77,7 +77,7 @@ data_prov <- data_prov %>%
     x1 = x1 +3
   )
 
-# Splines Prov ---------------------------------------------------------------
+# MR-BRT Model ---------------------------------------------------------------
 
 prov_mrbrt <- MRData()
 prov_mrbrt$load_df(
@@ -97,8 +97,8 @@ mod_prov <- MRBRT(
       alt_cov = "x1",
       use_spline = TRUE,
       # spline_knots = array(c(0, 0.25, 0.5, 0.75, 1)),
-      spline_knots = array(c(seq(0, 1, by = 0.1))),
-      spline_degree = 3L,
+      spline_knots = array(c(seq(0, 1, by = 0.2))),
+      spline_degree = 2L,
       spline_knots_type = 'frequency',
       # spline_r_linear = FALSE,
       # spline_l_linear = TRUE,
@@ -129,7 +129,7 @@ ggplot(data_prov) +
   labs(x = "Week", y = "Mortality per 100,000") +
   theme_bw()
 
-# Cascade splines Dep with Prov data -----------------------------------------
+# Cascade splines Dep  ----------------------------------------------------
 
 mod_spline_dpto <- run_spline_cascade(
   stage1_model_object = mod_prov,
