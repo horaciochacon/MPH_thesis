@@ -40,9 +40,9 @@ data_prov <- death_count_day %>%
   ungroup() %>% 
   mutate(
     y1 = n / pob,
-    ylog = log(y1 + 0.0000001),
+    ylog = log(y1 + min(y1)/2),
     x1 = (as.numeric(fecha_fallecimiento) - 18323) / 7,
-    sd = log(sqrt(1 / (y1 + 0.0000001)))
+    sd = log(sqrt(1 / (y1 + min(y1)/2)))
     # sd = 1
     # sd = log(sqrt(1 / y1))
   ) %>% 
@@ -59,9 +59,9 @@ province_baseline <- purrr:::map(
       x1 = x1 + .x,
       # x1 = 0 + .x,
       y1 = 0,
-      ylog = log(0 + 0.0000001),
+      ylog = log(0 + min(data_prov$y1)/2),
       n = 0,
-      sd = log(sqrt(1 / (y1 + 0.0000001)))
+      sd = log(sqrt(1 / (y1 + min(data_prov$y1)/2)))
       # sd = 1
       # sd = log(sqrt(1 / (y1 + 0.0000001)))
     )
