@@ -116,7 +116,7 @@ mod_prov <- MRBRT(
       use_spline = TRUE,
       # spline_knots = array(c(0, 0.25, 0.5, 0.75, 1)),
       spline_knots = array(c(seq(0, 1, by = 0.1))),
-      spline_degree = 2L,
+      spline_degree = 3L,
       spline_knots_type = 'frequency',
       # spline_r_linear = FALSE,
       # spline_l_linear = TRUE,
@@ -124,7 +124,7 @@ mod_prov <- MRBRT(
       # prior_spline_convexity_domain = array(c(0, 0.03))
       # prior_spline_monotonicity = 'increasing',
       # prior_spline_monotonicity_domain = array(c(0, 0.01))
-      prior_spline_maxder_gaussian = array(c(0, 0.05))
+      prior_spline_maxder_gaussian = array(c(0, 0.03))
     )
   )
 )
