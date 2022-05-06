@@ -130,7 +130,7 @@ mod_prov <- MRBRT(
 
 mod_prov$fit_model(inner_print_level = 5L, inner_max_iter = 10000L)
 
-df_pred <- data.frame(x1 = seq(0, 85, by = 0.1))
+df_pred <- data.frame(x1 = seq(0, 85, by = 0.01))
 
 dat_pred_prov <- MRData()
 dat_pred_prov$load_df(
@@ -163,7 +163,7 @@ mod_spline_dpto <- run_spline_cascade(
 
 df_pred <- expand.grid(
   stringsAsFactors = FALSE,
-  x1 = seq(0, 85, by = 0.1),
+  x1 = seq(0, 85, by = 0.01),
   dpt_cdc = unique(data_prov$dpt_cdc)
   ) %>%
   mutate(data_id = 1:nrow(.)) 
@@ -200,7 +200,7 @@ mod_spline_prov <- run_spline_cascade(
 # Prediction Provinces
 df_pred <- expand.grid(
   stringsAsFactors = FALSE,
-  x1 = seq(0, 80, by = 0.1),
+  x1 = seq(0, 80, by = 0.01),
   prov_cdc = unique(data_prov$prov_cdc)
   ) %>%
   mutate(data_id = 1:nrow(.)) %>% 
@@ -211,8 +211,8 @@ preds_cascade_prov <- predict_spline_cascade(
   newdata = df_pred) %>% 
   left_join(data_prov) 
 
-depts <- unique(data_prov$dpt_cdc)
-# depts <- "LORETO"
+# depts <- unique(data_prov$dpt_cdc)
+depts <- "ANCASH"
 
 for (i in depts) {
   
@@ -326,12 +326,12 @@ for (i in depts) {
     # )
 }
 
-# prov_time_series <- predict_spline_cascade(
-#   fit = mod_spline_prov,
-#   newdata = df_pred
-#   ) %>% 
-#   mutate(
-#     mortality = exp(pred)
-#   )
-# 
-# write.csv(prov_time_series, "data/pred_prov_time_series.csv")
+prov_time_series <- predict_spline_cascade(
+  fit = mod_spline_prov,
+  newdata = df_pred
+  ) %>%
+  mutate(
+    mortality = exp(pred)
+  )
+
+write.csv(prov_time_series, "data/pred_prov_time_series.csv")
