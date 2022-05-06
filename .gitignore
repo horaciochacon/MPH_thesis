@@ -2,4 +2,4 @@
 .Rhistory
 .RData
 .Ruserdata
-data/pred_prov_time_series.csv
+pred_prov_time_series.csv
