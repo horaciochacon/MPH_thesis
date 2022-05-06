@@ -16,8 +16,8 @@ death_count_day <- read.csv(
   "data/death_count_prov_day.csv",
   colClasses = c(
     "Date","character", "character","character","character","numeric"
-  )
-) %>% 
+    )
+  ) %>% 
   tibble()
 
 # Province level population
@@ -51,7 +51,6 @@ data_prov <- death_count_day %>%
       (1 - (y1 + min(y1, na.rm = TRUE)/2)) / 
         ((y1 + min(y1, na.rm = TRUE)/2) * pob)
     ),
-    sd2 = sqrt((1) / (y1 + min(y1, na.rm = TRUE)/2)),
     y_low = ylog - (1.96 * sd),
     y_upp = ylog + (1.96 * sd)
   ) %>% 
@@ -82,8 +81,8 @@ province_baseline <- purrr:::map(
       #   ),
       y_low = ylog - (1.96 * sd),
       y_upp = ylog + (1.96 * sd)
-    )
-) %>%
+      )
+  ) %>%
   bind_rows()
 
 # Final provincial dataset with baseline dummy data
@@ -104,7 +103,7 @@ prov_mrbrt$load_df(
   col_obs_se = "sd",
   col_covs = list("x1"), 
   col_study_id = "id" 
-)
+  )
 
 
 mod_prov <- MRBRT(
@@ -125,9 +124,9 @@ mod_prov <- MRBRT(
       # prior_spline_monotonicity = 'increasing',
       # prior_spline_monotonicity_domain = array(c(0, 0.01))
       prior_spline_maxder_gaussian = array(c(0, 0.03))
+      )
     )
   )
-)
 
 mod_prov$fit_model(inner_print_level = 5L, inner_max_iter = 10000L)
 
@@ -137,7 +136,7 @@ dat_pred_prov <- MRData()
 dat_pred_prov$load_df(
   data = df_pred, 
   col_covs = list('x1')
-)
+  )
 
 pred_prov <- mod_prov$predict(data = dat_pred_prov)
 
@@ -160,19 +159,19 @@ mod_spline_dpto <- run_spline_cascade(
   output_dir = "output/",
   model_label = "mbrt_cascade_dpto2_peru",
   overwrite_previous = TRUE
-)
+  )
 
 df_pred <- expand.grid(
   stringsAsFactors = FALSE,
   x1 = seq(0, 85, by = 0.1),
   dpt_cdc = unique(data_prov$dpt_cdc)
-) %>%
+  ) %>%
   mutate(data_id = 1:nrow(.)) 
 
 pred_cascade_dpto <- predict_spline_cascade(
   fit = mod_spline_dpto,
   newdata = df_pred
-) %>% 
+  ) %>% 
   left_join(data_prov)
 
 # ggplot(data = pred_cascade_dpto) +
@@ -196,21 +195,20 @@ mod_spline_prov <- run_spline_cascade(
   output_dir = "output/",
   model_label = "mbrt_cascade_peru_prov",
   overwrite_previous = TRUE
-)
+  )
 
 # Prediction Provinces
 df_pred <- expand.grid(
   stringsAsFactors = FALSE,
   x1 = seq(0, 80, by = 0.1),
   prov_cdc = unique(data_prov$prov_cdc)
-) %>%
+  ) %>%
   mutate(data_id = 1:nrow(.)) %>% 
   left_join(poblacion_prov %>% select(-pob))
 
 preds_cascade_prov <- predict_spline_cascade(
   fit = mod_spline_prov,
-  newdata = df_pred
-) %>% 
+  newdata = df_pred) %>% 
   left_join(data_prov) 
 
 depts <- unique(data_prov$dpt_cdc)
@@ -313,27 +311,27 @@ for (i in depts) {
     draw_plot(graph_dpto_log, x = 0.25, y = .7, width = .5, height = .3) +
     draw_plot(graph_prov_log, x = 0, y = 0, width = 1, height = 0.7)
 
-  print(graph_log)
+  # print(graph_log)
   print(graph)
   
-  ggsave(
-    plot = graph_log, 
-    filename =  paste0("plots/final/log-",i, ".png"), 
-    scale = 2
-    )
-  ggsave(
-    plot = graph,
-    filename =  paste0("plots/final/exp-",i, ".png"),
-    scale = 2
-    )
+  # ggsave(
+  #   plot = graph_log, 
+  #   filename =  paste0("plots/final/log-",i, ".png"), 
+  #   scale = 2
+  #   )
+  # ggsave(
+  #   plot = graph,
+  #   filename =  paste0("plots/final/exp-",i, ".png"),
+  #   scale = 2
+    # )
 }
 
-prov_time_series <- predict_spline_cascade(
-  fit = mod_spline_prov,
-  newdata = df_pred
-  ) %>% 
-  mutate(
-    mortality = exp(pred)
-  )
-
-write.csv(prov_time_series, "data/pred_prov_time_series.csv")
+# prov_time_series <- predict_spline_cascade(
+#   fit = mod_spline_prov,
+#   newdata = df_pred
+#   ) %>% 
+#   mutate(
+#     mortality = exp(pred)
+#   )
+# 
+# write.csv(prov_time_series, "data/pred_prov_time_series.csv")

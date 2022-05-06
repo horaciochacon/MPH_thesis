@@ -15,7 +15,6 @@ map_prov <- read_sf("data/provincias/PROVINCIAS.shp") %>%
   )
 
 
-
 # Read predicted mortality time series ------------------------------------
 
 prov_preds <- read.csv("data/pred_prov_time_series.csv") %>% 
