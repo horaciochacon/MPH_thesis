@@ -43,6 +43,29 @@ get_peak_province <- function(x, threshold) {
   peak
 }
 
+
+get_peak_province <- function(x, min_threshold, variation_threshold) {
+  peak <- c(TRUE, TRUE, rep(NA, 557), FALSE)
+  nadir <- c(TRUE, TRUE, rep(NA, 557), FALSE)
+  for (i in 1:(length(x)-1)) {
+    if (x[i] > min_threshold ) {
+      peak[i] <- x[i] > x[i-1]  & x[i] >= x[i+1] &
+        x[i] > x[i-2]  & x[i] >= x[i+2]
+      
+      nadir[i] <- x[i] < x[i-1]  & x[i] <= x[i+1] &
+        x[i] < x[i-2]  & x[i] <= x[i+2]
+    } else{
+      peak[i] <- FALSE
+    } 
+    if(peak[i] & (x[i] <=
+                  (x[which(nadir)][length(which(nadir))] +
+                   variation_threshold))) {
+      peak[i] <- FALSE
+    }
+  }
+  peak
+}
+
 # Plotting functions ------------------------------------------------------
 
 geom_gam_dates <- function() {
