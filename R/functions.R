@@ -30,23 +30,10 @@ get_peak <- function(x) {
   peak
 }
 
-get_peak_province <- function(x, threshold) {
-  peak <- vector()
-  for (i in 2:length(x)) {
-    if (x[i] > threshold) {
-      peak[i] <- x[i] > x[i-1]  & x[i] >= x[i+1] &
-        x[i] > x[i-2]  & x[i] >= x[i+2]
-    } else{
-      peak[i] <- NA
-    }
-  }
-  peak
-}
-
 
 get_peak_province <- function(x, min_threshold, variation_threshold) {
-  peak <- c(TRUE, TRUE, rep(NA, 557), FALSE)
-  nadir <- c(TRUE, TRUE, rep(NA, 557), FALSE)
+  peak <- c(TRUE, TRUE, rep(NA, 558), FALSE)
+  nadir <- c(TRUE, TRUE, rep(NA, 558), FALSE)
   for (i in 1:(length(x)-1)) {
     if (x[i] > min_threshold ) {
       peak[i] <- x[i] > x[i-1]  & x[i] >= x[i+1] &

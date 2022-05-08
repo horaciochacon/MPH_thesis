@@ -7,6 +7,31 @@ library(janitor)
 library(stringr)
 library(stringi)
 library(readxl)
+library(lubridate)
+
+
+# Read relevant data sources ----------------------------------------------
+
+# Population provinces
+poblacion_prov <- read.csv("data/poblacion_provincial_peru.csv") %>% 
+  group_by(dpt_cdc = DEPARTAMENTO,prov_cdc = PROVINCIA) %>% 
+  summarise(pob = sum(POBLACION)) %>% ungroup() %>%  select(prov_cdc, pob)
+
+# EsSalud insurance
+essalud <- read_excel("data/aseguramiento_essalud.xlsx", sheet = 1) %>% 
+  mutate(
+    prov_cdc = str_to_upper(stri_trans_general(prov_cdc, id = "Latin-ASCII")),
+    prov_cdc = case_when(
+      prov_cdc == "ANTONIO RAYMONDI" ~ "ANTONIO RAIMONDI",
+      prov_cdc == "MARANON" ~ "MARAÑON",
+      prov_cdc == "FERRENAFE" ~ "FERREÑAFE",
+      prov_cdc == "CANETE" ~ "CAÑETE",
+      prov_cdc == "DATEM DEL MARANON" ~ "DATEM DEL MARAÑON",
+      prov_cdc == "DANIEL A. CARRION" ~ "DANIEL ALCIDES CARRION",
+      TRUE ~ prov_cdc
+      )
+    ) %>% 
+  select(prov_cdc, porc_essalud)
 
 # Provincial (Adm2) maps
 map_prov <- read_sf("data/provincias/PROVINCIAS.shp") %>% 
@@ -19,8 +44,7 @@ map_prov <- read_sf("data/provincias/PROVINCIAS.shp") %>%
   )
 
 # HDI United nations
-
-idh <- read_excel("data/IDH%202019.xlsx", sheet = 3, skip = 2, n_max = 199) %>% 
+idh <- read_excel("data/IDH%202019.xlsx", sheet = 3, skip = 2, n_max = 200) %>% 
   clean_names() %>% 
   select(
     prov_cdc = x3, 
@@ -50,20 +74,23 @@ idh <- read_excel("data/IDH%202019.xlsx", sheet = 3, skip = 2, n_max = 199) %>%
   ) %>% 
   mutate_at(vars(2:7), ~as.numeric(.))
 
-# Read predicted mortality time series ------------------------------------
-
+# Read predicted mortality time series 
 provinces <- read.csv("data/pred_prov_time_series.csv") %>% 
   mutate(day = round(x1 * 7, digits = 1), .after = x1) %>% 
-  filter(day %in% 1:560) %>% 
+  filter(day %in% 0:560) %>% 
   distinct(day, prov_cdc, .keep_all = TRUE) %>% 
   tibble() %>% 
-  select(day, prov_cdc, dpt_cdc, pred, mortality)
+  select(day, prov_cdc, dpt_cdc, pred, mortality) %>% 
+  mutate(date = as_date(day + 18323), .before = day)
   
 prov_preds_complete <- provinces %>% 
   split(.$prov_cdc)
 
 provinces_list <- provinces %>% 
   distinct(dpt_cdc, prov_cdc)
+
+
+# Feature extraction and integration --------------------------------------
 
 # Split into province independent list of dataframes
 prov_preds <- prov_preds_complete %>%
@@ -77,6 +104,7 @@ first_peak <- prov_preds %>%
       filter(peak) %>%
       .[1,] %>% 
       select(
+        date_first_peak = date,
         day_first_peak = day,
         mort_first_peak = mortality, 
         dpt_cdc, prov_cdc)
@@ -91,6 +119,7 @@ second_peak <- prov_preds %>%
       filter(peak) %>%
       .[2,] %>% 
       select(
+        date_second_peak = date,
         day_second_peak = day,
         mort_second_peak = mortality, 
         dpt_cdc, prov_cdc)
@@ -110,20 +139,39 @@ n_peak <- prov_preds %>%
   bind_rows() %>% 
   na.omit()
 
-provinces_list <- provinces_list %>% 
+# Extract cumulative deaths
+deaths <- prov_preds %>% 
+  map(
+    ~tibble(
+      prov_cdc = .x %>% pull(prov_cdc) %>% unique(),
+      deaths = .x %>% 
+        left_join(poblacion_prov) %>% 
+        mutate(deaths = pob * mortality) %>% 
+        pull(deaths) %>% sum()/7
+    )
+  ) %>% 
+  bind_rows()
+
+
+# Merging in final features dataset
+provinces_final <- provinces_list %>%
+  left_join(essalud) %>% 
+  left_join(deaths) %>% 
   left_join(first_peak) %>% 
   left_join(second_peak) %>% 
   left_join(n_peak) %>% 
   mutate(dist_peaks = day_second_peak - day_first_peak) %>% 
-  left_join(idh)
+  left_join(idh) 
 
 
 # Plots -------------------------------------------------------------------
 
 library(GGally)
 
-provinces_list %>% 
-  select(day_first_peak:household_per_capita_income) %>% 
+provinces_final %>% 
+  # filter(!(prov_cdc %in% c("LIMA"))) %>% 
+  select(porc_essalud, day_first_peak, mort_first_peak, day_second_peak,
+         mort_second_peak, idh) %>% 
   ggpairs(
     lower = list(
       continuous = wrap("points", size = 0.5, alpha = 0.5),
@@ -131,8 +179,10 @@ provinces_list %>%
       )
     )
 
-provinces_list %>% 
-  select(day_first_peak:household_per_capita_income) %>% 
+provinces_final %>% 
+  select(porc_essalud, day_first_peak, mort_first_peak, day_second_peak,
+         mort_second_peak, idh) %>% 
+  # select(day_first_peak:household_per_capita_income) %>% 
   ggpairs(
     aes(color = day_first_peak < 250),
     lower = list(
@@ -140,7 +190,7 @@ provinces_list %>%
       )
     )
 
-provinces_list %>% 
+provinces_final %>% 
   select(day_first_peak:dist_peaks) %>% 
   ggpairs(aes(color = as.factor(n_peak)))
 
