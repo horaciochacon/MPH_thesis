@@ -6,6 +6,9 @@ library(EpiEstim)
 library(incidence)
 library(lubridate)
 library(tidyr)
+library(stringr)
+library(stringi)
+library(janitor)
 
 
 # Reading the necessary data -----------------------------------------------
@@ -40,6 +43,32 @@ prov_preds <- read.csv("data/pred_prov_time_series.csv") %>%
   select(date, I, prov_cdc) %>% 
   split(.$prov_cdc)
 
+# Mobility Reports
+mobility <- read.csv("data/2021_PE_Region_Mobility_Report.csv") %>% 
+  bind_rows(read.csv("data/2020_PE_Region_Mobility_Report.csv")) %>% 
+  filter(sub_region_2 != "") %>% 
+  select(prov_cdc = sub_region_2, date,
+         "retail_and_recreation_percent_change_from_baseline":
+           "residential_percent_change_from_baseline") %>% 
+  mutate(
+    prov_cdc = str_squish(
+      str_remove(str_remove_all(prov_cdc, "Province"), " of")
+      )
+  ) %>% 
+  mutate(
+    prov_cdc = str_to_upper(
+      stri_trans_general(prov_cdc, id = "Latin-ASCII")
+    ),
+    date = as_date(date)
+  ) %>% 
+  rowwise() %>% 
+  mutate(mob = mean(
+    c_across("retail_and_recreation_percent_change_from_baseline":
+               "residential_percent_change_from_baseline"), na.rm = TRUE)) %>% 
+  select(prov_cdc, date, mob) %>% 
+  arrange(prov_cdc, date)
+  
+
 # Estimating Rt -----------------------------------------------------------
 
 rt_list <- prov_preds %>% 
@@ -57,7 +86,12 @@ rt_peak <- rt_list %>%
       filter(`Quantile.0.025(R)` == max(`Quantile.0.025(R)`)) %>% 
       mutate(prov_cdc = .y, .before = t_start) %>% 
       select(1,3,4,6)
-  ) 
+  ) %>% 
+  map2(
+    rt_list,
+    ~.x %>% 
+      mutate(I_peak = .y$I[.x$t_end])
+  )
 
 rt_peak_df <- rt_peak %>% 
   bind_rows()
