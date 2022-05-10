@@ -17,14 +17,21 @@ migration <- read_excel("data/RetProyProv.xls") %>%
     )
   )
 
-
 provinces <- provinces %>% 
   left_join(migration) %>% 
   left_join(rt) %>% 
   mutate(
-    mig_arrival_perc = retor_llegaron / pop
+    mig_arrival_perc = retor_llegaron / pop,
+    log_mort1 = mort_first_peak,
+    log_mort2 = mort_second_peak
+  ) %>% 
+  tibble() %>% 
+  select(
+    prov_cdc, log_mort1, day_first_peak, log_mort2, day_second_peak,
+    n_peak, dist_peaks, rt, day_rt = day, idh, porc_essalud, mob, 
+    mig_arrival_perc
   )
-
+  
 
 # Plots -------------------------------------------------------------------
 
@@ -51,6 +58,42 @@ provinces %>%
     aes(
       x = mig_arrival_perc, 
       y = log(mort_second_peak),
+      color = idh < 0.42
+    )
+  ) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Day first peak
+provinces %>% 
+  ggplot(
+    aes(
+      x = mig_arrival_perc, 
+      y = day_first_peak,
+      color = idh < 0.42
+    )
+  ) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Day second peak
+provinces %>% 
+  ggplot(
+    aes(
+      x = mig_arrival_perc, 
+      y = day_second_peak,
+      color = idh < 0.42
+    )
+  ) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Day second peak
+provinces %>% 
+  ggplot(
+    aes(
+      x = mig_arrival_perc, 
+      y = dist_peaks,
       color = idh < 0.42
     )
   ) +

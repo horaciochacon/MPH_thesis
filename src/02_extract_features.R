@@ -81,7 +81,8 @@ provinces <- read.csv("data/pred_prov_time_series.csv") %>%
   distinct(day, prov_cdc, .keep_all = TRUE) %>% 
   tibble() %>% 
   select(day, prov_cdc, dpt_cdc, pred, mortality) %>% 
-  mutate(date = as_date(day + 18323), .before = day)
+  mutate(date = as_date(day + 18323), .before = day) %>% 
+  filter(between(date, as_date("2020-03-02"), as_date("2021-06-30")))
   
 prov_preds_complete <- provinces %>% 
   split(.$prov_cdc)
@@ -94,15 +95,15 @@ provinces_list <- provinces %>%
 
 # Split into province independent list of dataframes
 prov_preds <- prov_preds_complete %>%
-  map(. %>% mutate(peak = get_peak_province(mortality, 5e-5, 4e-5)))
+  map(. %>% mutate(peak = get_peak_province(mortality, 2e-5, 2e-5)))
       
 
 # Extract first peak
 first_peak <- prov_preds %>% 
   map(
     . %>% 
-      filter(peak) %>%
-      .[1,] %>% 
+      filter(peak & day <= 300) %>% 
+      .[which.max(.$mortality),] %>% 
       select(
         date_first_peak = date,
         day_first_peak = day,
@@ -116,8 +117,8 @@ first_peak <- prov_preds %>%
 second_peak <- prov_preds %>% 
   map(
     . %>% 
-      filter(peak) %>%
-      .[2,] %>% 
+      filter(peak & day > 300) %>% 
+      .[which.max(.$mortality),] %>% 
       select(
         date_second_peak = date,
         day_second_peak = day,
@@ -180,16 +181,16 @@ provinces_final %>%
       )
     )
 
-provinces_final %>% 
-  select(porc_essalud, day_first_peak, mort_first_peak, day_second_peak,
-         mort_second_peak, idh) %>% 
-  # select(day_first_peak:household_per_capita_income) %>% 
-  ggpairs(
-    aes(color = day_first_peak < 250),
-    lower = list(
-      continuous = wrap("points", size = 0.5, alpha = 0.5)
-      )
-    )
+# provinces_final %>% 
+#   select(porc_essalud, day_first_peak, mort_first_peak, day_second_peak,
+#          mort_second_peak, idh) %>% 
+#   # select(day_first_peak:household_per_capita_income) %>% 
+#   ggpairs(
+#     aes(color = day_first_peak < 250),
+#     lower = list(
+#       continuous = wrap("points", size = 0.5, alpha = 0.5)
+#       )
+#     )
 
 provinces_final %>% 
   select(day_first_peak:dist_peaks) %>% 
@@ -203,7 +204,7 @@ provinces_final %>%
 
 
 # Map 196 provinces peaks
-for (i in 1:10) {
+for (i in 1:100) {
   g <- ggplot() +
     geom_line(
       aes(x = day, y = mortality * 100000),
@@ -218,18 +219,31 @@ for (i in 1:10) {
       x = "Weeks",
       y = "Mortality rate"
     ) +
-    theme_bw() +
-    ylim(c(0, 80)) 
+    theme_bw()
   
   if (sum(prov_preds[[i]]$peak) > 0) {
     g <-  g +
       geom_label_repel(
-        aes(x = day, y = mortality * 100000, label = "peak"),
+        aes(x = day_first_peak, y = mort_first_peak * 100000, label = "peak"),
         nudge_y = 10,
-        data =  prov_preds[[i]] %>% filter(peak),
+        data =  first_peak %>%
+          filter(prov_cdc == unique(prov_preds[[i]]$prov_cdc)),
         arrow = arrow(length = unit(0.015, "npc"))
       ) 
   }
+  
+  if (second_peak %>%
+      filter(prov_cdc == unique(prov_preds[[i]]$prov_cdc)) %>% nrow() > 0) {
+   g <- g +
+      geom_label_repel(
+        aes(x = day_second_peak, y = mort_second_peak * 100000, label = "peak"),
+        nudge_y = 10,
+        data =  second_peak %>%
+          filter(prov_cdc == unique(prov_preds[[i]]$prov_cdc)),
+        arrow = arrow(length = unit(0.015, "npc"))
+      ) 
+  }
+  
   print(g)
   
   # ggsave(

@@ -21,7 +21,7 @@ poblacion_prov <- read.csv("data/poblacion_provincial_peru.csv") %>%
 # Read Time-varying 
 peru_ifr <- read.csv("data/peru_ifr.csv") %>% 
   as_tibble() %>%  mutate(date = as_date(date)) %>% 
-  filter(between(date, as_date("2020-03-02"), as_date("2021-09-13"))) %>% 
+  filter(between(date, as_date("2020-03-02"), as_date("2021-06-30"))) %>% 
   mutate(mean = ifelse(is.infinite(mean), NA, ifelse(mean==0,0.0161,mean))) %>% 
   fill(mean, .direction = "up") %>% 
   select(date, ifr = mean)
@@ -56,7 +56,7 @@ mobility <- read.csv("data/2021_PE_Region_Mobility_Report.csv") %>%
       )
     ) %>% 
   select(prov_cdc, date, mob) %>% 
-  filter(between(date, as.Date("2020-03-02"), as.Date("2021-09-13"))) %>% 
+  filter(between(date, as.Date("2020-03-02"), as.Date("2021-06-30"))) %>% 
   arrange(prov_cdc, date)
 
 # Read predicted mortality time series 
@@ -67,6 +67,7 @@ prov_preds <- read.csv("data/pred_prov_time_series.csv") %>%
   tibble() %>% 
   select(day, prov_cdc, dpt_cdc, pred, mortality) %>% 
   mutate(date = as_date(day + 18323), .before = day) %>% 
+  filter(between(date, as.Date("2020-03-02"), as.Date("2021-06-30"))) %>%
   left_join(peru_ifr) %>% 
   left_join(poblacion_prov) %>% 
   mutate(
