@@ -163,6 +163,7 @@ provinces_final <- provinces_list %>%
   mutate(dist_peaks = day_second_peak - day_first_peak) %>% 
   left_join(idh) 
 
+write.csv(provinces_final, "output/provinces_final.csv", row.names = FALSE)
 
 # Plots -------------------------------------------------------------------
 

@@ -26,6 +26,39 @@ peru_ifr <- read.csv("data/peru_ifr.csv") %>%
   fill(mean, .direction = "up") %>% 
   select(date, ifr = mean)
 
+# Mobility Reports
+mobility <- read.csv("data/2021_PE_Region_Mobility_Report.csv") %>% 
+  bind_rows(read.csv("data/2020_PE_Region_Mobility_Report.csv")) %>% 
+  filter(sub_region_2 != "") %>% 
+  select(prov_cdc = sub_region_2, date,
+         "retail_and_recreation_percent_change_from_baseline":
+           "residential_percent_change_from_baseline") %>% 
+  mutate(
+    prov_cdc = str_squish(
+      str_remove(str_remove_all(prov_cdc, "Province"), " of")
+    )
+  ) %>% 
+  mutate(
+    prov_cdc = str_to_upper(
+      stri_trans_general(prov_cdc, id = "Latin-ASCII")
+    ),
+    date = as_date(date)
+  ) %>% 
+  rowwise() %>% 
+  mutate(mob = mean(
+    c_across("retail_and_recreation_percent_change_from_baseline":
+               "residential_percent_change_from_baseline"), na.rm = TRUE),
+    prov_cdc = case_when(
+      prov_cdc == "FERRENAFE" ~ "FERREÑAFE",
+      prov_cdc == "CANETE" ~ "CAÑETE",
+      prov_cdc == "CONSTITUTIONAL CALLAO" ~ "CALLAO",
+      TRUE ~ prov_cdc
+      )
+    ) %>% 
+  select(prov_cdc, date, mob) %>% 
+  filter(between(date, as.Date("2020-03-02"), as.Date("2021-09-13"))) %>% 
+  arrange(prov_cdc, date)
+
 # Read predicted mortality time series 
 prov_preds <- read.csv("data/pred_prov_time_series.csv") %>% 
   mutate(day = round(x1 * 7, digits = 1), .after = x1) %>% 
@@ -40,41 +73,19 @@ prov_preds <- read.csv("data/pred_prov_time_series.csv") %>%
     D = mortality * pob / 7,
     I = D / ifr
   ) %>% 
-  select(date, I, prov_cdc) %>% 
-  split(.$prov_cdc)
-
-# Mobility Reports
-mobility <- read.csv("data/2021_PE_Region_Mobility_Report.csv") %>% 
-  bind_rows(read.csv("data/2020_PE_Region_Mobility_Report.csv")) %>% 
-  filter(sub_region_2 != "") %>% 
-  select(prov_cdc = sub_region_2, date,
-         "retail_and_recreation_percent_change_from_baseline":
-           "residential_percent_change_from_baseline") %>% 
-  mutate(
-    prov_cdc = str_squish(
-      str_remove(str_remove_all(prov_cdc, "Province"), " of")
-      )
-  ) %>% 
-  mutate(
-    prov_cdc = str_to_upper(
-      stri_trans_general(prov_cdc, id = "Latin-ASCII")
-    ),
-    date = as_date(date)
-  ) %>% 
-  rowwise() %>% 
-  mutate(mob = mean(
-    c_across("retail_and_recreation_percent_change_from_baseline":
-               "residential_percent_change_from_baseline"), na.rm = TRUE)) %>% 
-  select(prov_cdc, date, mob) %>% 
-  arrange(prov_cdc, date)
-  
+  select(date, day, I, prov_cdc) %>%
+  left_join(mobility) %>%
+  split(.$prov_cdc)  %>% 
+  map(
+    ~.x %>% fill(mob, .direction = "up")
+  )
 
 # Estimating Rt -----------------------------------------------------------
 
 rt_list <- prov_preds %>% 
   map(
     ~estimate_R(
-      .x, "parametric_si", 
+      .x[c(1:3)], "parametric_si", 
       config = make_config(list(mean_si = 5.4, std_si = 0.11)))
   )
 
@@ -94,7 +105,16 @@ rt_peak <- rt_list %>%
   )
 
 rt_peak_df <- rt_peak %>% 
-  bind_rows()
+  map2(
+    prov_preds,
+    ~.x %>% 
+      mutate(infection_day = t_end - 7) %>% 
+      left_join(.y, by = c("infection_day" = "day", "prov_cdc" = "prov_cdc"))
+  ) %>% 
+  bind_rows() %>% 
+  select(prov_cdc, day = t_end, date, infection_day, rt = `Mean(R)`, I_peak, mob)
+
+write.csv(rt_peak_df, "output/rt_peak_df.csv", row.names = FALSE)
 
 # Plots -------------------------------------------------------------------
 
@@ -107,5 +127,16 @@ map2(
     labs(title = .y$prov_cdc) +
     geom_vline(xintercept = .y$t_end)
 )
+
+rt_peak_df %>% 
+  ggplot(aes(x = mob, y = rt, color = day < 200 )) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+rt_peak_df %>% 
+  ggplot(aes(x = mob, y = rt)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
 
 
