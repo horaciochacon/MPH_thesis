@@ -1,18 +1,54 @@
 ---
-title: "Thesis"
-author: "Horacio Chacon"
-date: "10/5/2022"
-output: 
-  pdf_document: 
-    template: uwthesis.tex
-latex_engine: pdflatex
-
+title: "Identifying drivers of spatial-temporal heterogeneity in COVID-19 outcomes during the 2020-2021 outbreak in Peru"
+author: "Horacio Alfonso Chacon Torrico"
+output: pdf_document
+bibliography: references.bib
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+# Introduction
 
-## R Markdown
+Peru is a South American country with a long Pacific Ocean coastline, home to more than 32 million inhabitants. It has experienced significant macroeconomic growth for the past three decades; unfortunately, this prosperity has not necessarily been reflected in an improved social welfare status [@dargent2017]. As a middle-income country, it mainly comprises an urbanized population (80%) in 26 administrative regions [@healtha2017]. Even with significant public health successes in the past decades, such as the halving of under-5 child mortality in fifteen? years (39 deaths per 1,000 live births in 2000 to 17 in 2015) [@hirschhorn2020exemplars], many structural inequalities remain in the health system, which triggered some of the devastating effects of the COVID-19 pandemic [@lossio2021]. This resulted in Peru reporting the most extensive per-capita mortality globally [@John_Hopkins2021-li].
 
+The COVID-19 pandemic has caused worldwide disruption since its appearance at the end of 2019. Peru's case is interesting because it started strong, yet rapidly lost ground and finished 2021 quite poorly. While several countries around the world imposed delayed responses and did not take immediate accountability until the initial waves were severe, other countries installed strict mitigation and suppression strategies from the beginning. For example, Peru imposed one of the region's earliest nationwide lockdowns in place, along with Argentina, by mid-March 2020 @lossio2021 . Yet, despite central-level efforts, by November 2021, the John's Hopkins Coronavirus Resource Center reported that Peru ranked first among nations in deaths per 100,000, at 616.95 [@John_Hopkins2021-li]. Peru's deaths are almost double than the second-highest ranking country by per-capita mortality (Bulgaria with 357.52 deaths per 100,000 persons).
 
+The World Health Organization declared the COVID-19 outbreak as a pandemic in March 2020. After and before that date, many countries worldwide applied distinct approaches to slow transmission progression, but similarities remained. For example, the Philippines imposed travel restrictions as early as January 28, 2020, even before the first confirmed case, January 30. In addition, authorities developed community interventions called "enhanced community quarantine", which comprised a telework mandate, suspension of public transport, prohibition of mass gatherings, and government facilitated the provision of food and essential health services in selected provinces @amit2021.
+
+Unlike other countries that imposed strict suppression strategies, Sweden opted for a modest mitigation strategy at the beginning of the pandemic, tailoring strategies only to vulnerable populations, like the elderly and ill, trying not to disrupt socioeconomic services such as education and economy. This effectively imposed less stress on the nation's economy and less disruption to the social life but produced a higher burden of disease. As a result, Sweden suffered a mortality rate of 146 deaths per 100,000 inhabitants [@baral2021].
+
+Peru was not different from other countries when responding to COVID-19. The initial months of the Peruvian government's COVID response included failures that evolved into an unfortunate number of deaths. On March 15, the Peruvian government dictated a two-week total country lockdown that was subsequently extended to June 26 @lossio2021. Additionally, social protection measures, such as food distribution and cash transfers, were implemented to counter the effect of lockdown on the informal sector, whose population relied mainly on daily income @gianella2020. The government also put in place strict punishment for misinformation @alvarez-risco2020. In Peru, the burden of COVID-19, as in other places around the world, has been unequally distributed among marginalized and underserved populations @gianella2020. The underserved urban communities suffered a high COVID burden, but so did native communities in the Amazonian jungle, both groups suffering a disproportionate number of deaths @montag2021.
+
+Although not discussed enough in the highly active and productive COVID literature, some authors have proposed explanations for Peru's catastrophic and deadly COVID experience. Theories include inadequate choice of testing supplies at the beginning of the pandemic, high economic and social inequality, the highly informal workforce and economy and the lack of social protection and access to adequate health services @rees2021. Understanding the drivers of heterogeneity in the COVID-19 response is relevant from a public and global health perspective, as it could inform policymakers what interventions contribute to mitigating the outbreaks.
+
+# Methods
+
+## Study scope and data sources
+
+The study used the national database of COVID-19 mortality, openly available with anonymized patient-level information about deaths [@Gobierno_del_Peru2021]. Peru recently updated its COVID-19 mortality estimates, and, given that testing access and availability during the first two waves were insufficient to meet the diagnostic requirements of the outbreak, the best measure to estimate transmission is COVID-19 related deaths. In addition, we would consider the time range until June 2021, when the general population had not started to receive vaccination in Peru.
+
+Peru has three administrative-political levels, starting from the largest, the department, the next level is the province, and finally, at the smallest level, the district. Therefore, we will analyze and model deaths at the national, departmental (n = 25) and province levels (n = 196). Additionally, to obtain standardized mortality rates, the country, departmental and province-level population numbers are obtained from the National Institute Statistic and Informatics and 2017 census data [@INEI_censo].
+
+Additional province-level covariates will be obtained from different sources such as UNDP and IDB.
+
+Internal migration @fort2021
+
+Mobility reports @Google_undated-jv
+
+## Study design
+
+We used a correlational and modeling analysis approach to times series data from the mortality datasets described previously. Three analytic stages comprised the study, described in detail in further sections:
+
+1.  Exploratory descriptive analysis and model fit of COVID-19 mortality time series in Peru at the second administrative level.
+2.  Epidemic modeling to extract COVID-19 disease transmission features of the outbreak in Peru.
+3.  Correlational analysis of the epidemic features and province-level characteristics.
+
+## Variables
+
+### Dependent variables
+
+The dependent outcome variable for the study was be the time-varying per-capita COVID-19 mortality rate. This variable was extracted at the national, departmental, and provincial levels. It would be estimated by fitting a Meta-Regression Bayesian, Regularized and Trimmed (MR-BRT) mixed-effects linear model. Precisely, we will fit a cascade spline model, where smaller regions will borrow strength from the higher-level areas, which would act as priors for the model fitting. This would be particularly important for regions with few data points but where the estimates from the higher-level region could provide information for the model fitting process.
+
+# Results
+
+# Discussion
+
+# References

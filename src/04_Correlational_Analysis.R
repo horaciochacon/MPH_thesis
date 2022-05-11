@@ -1,3 +1,4 @@
+library(ggbiplot)
 library(dplyr)
 library(readxl)
 library(ggplot2)
@@ -126,7 +127,53 @@ mod.rt <- lm(
 
 summary(mod.rt)
 
+
+# PCA covariates ----------------------------------------------------------
+
+provinces.cov <- provinces %>% 
+  select(idh, education_years, porc_essalud, mig_arrival_perc,
+         porc_fem, porc_65_plus) %>% 
+  na.omit()
+
+prov.cov.pca <- prcomp(provinces.cov, center = TRUE, scale. = TRUE)
+
+summary(prov.cov.pca)
+
+provinces.cov <- provinces %>% 
+  select(idh, education_years, porc_essalud, mig_arrival_perc,
+         porc_fem, porc_65_plus, log_mort1, log_mort_cum, idh_low) %>% 
+  na.omit() %>% 
+  mutate(
+    x = prov.cov.pca$x[,1],
+    y = prov.cov.pca$x[,2]
+  )
+
+ggbiplot(
+  prov.cov.pca, 
+  obs.scale = 1, 
+  alpha = 0,
+  ellipse = TRUE,
+  groups = provinces.cov$idh_low
+  ) +
+  geom_point(
+    aes(x = x, y = y, size = log_mort1),
+    alpha = 0.5,
+    data = provinces.cov
+    ) +
+  theme_bw()
+
+
 # Plots -------------------------------------------------------------------
+
+#Correlation Matrix
+provinces.na %>% 
+  select(
+    log_mort_cum:day_second_peak, day_rt:idh, education_years:porc_essalud,
+    mig_arrival_perc,porc_fem:porc_65_plus
+    ) %>% cor() %>% 
+corrplot(type = "upper", method = "square", diag = FALSE, insig='blank',
+         addCoef.col ='black', number.cex = 0.8, order = 'AOE')
+
 
 provinces %>% 
   ggplot(aes(x = mig_arrival_perc, y = log_mort1)) +
