@@ -1,0 +1,18 @@
+---
+title: "Thesis"
+author: "Horacio Chacon"
+date: "10/5/2022"
+output: 
+  pdf_document: 
+    template: uwthesis.tex
+latex_engine: pdflatex
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
