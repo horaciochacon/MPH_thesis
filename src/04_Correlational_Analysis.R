@@ -130,38 +130,108 @@ summary(mod.rt)
 
 # PCA covariates ----------------------------------------------------------
 
-provinces.cov <- provinces %>% 
+# First Peak
+provinces.cov.1 <- provinces %>% 
   select(idh, education_years, porc_essalud, mig_arrival_perc,
          porc_fem, porc_65_plus) %>% 
   na.omit()
 
-prov.cov.pca <- prcomp(provinces.cov, center = TRUE, scale. = TRUE)
+prov.cov.pca.1 <- prcomp(provinces.cov.1, center = TRUE, scale. = TRUE)
 
-summary(prov.cov.pca)
+summary(prov.cov.pca.1)
 
-provinces.cov <- provinces %>% 
+provinces.cov.1 <- provinces %>% 
   select(idh, education_years, porc_essalud, mig_arrival_perc,
          porc_fem, porc_65_plus, log_mort1, log_mort_cum, idh_low) %>% 
   na.omit() %>% 
   mutate(
-    x = prov.cov.pca$x[,1],
-    y = prov.cov.pca$x[,2]
+    x = prov.cov.pca.1$x[,1],
+    y = prov.cov.pca.1$x[,2]
   )
 
 ggbiplot(
-  prov.cov.pca, 
+  prov.cov.pca.1, 
   obs.scale = 1, 
   alpha = 0,
   ellipse = TRUE,
-  groups = provinces.cov$idh_low
+  groups = provinces.cov.1$idh_low
   ) +
   geom_point(
     aes(x = x, y = y, size = log_mort1),
     alpha = 0.5,
-    data = provinces.cov
+    data = provinces.cov.1
     ) +
   theme_bw()
 
+# Second Peak
+provinces.cov.2 <- provinces %>% 
+  filter(!is.na(log_mort2)) %>% 
+  select(idh, education_years, porc_essalud, mig_arrival_perc,
+         porc_fem, porc_65_plus) %>% 
+  na.omit()
+
+prov.cov.pca.2 <- prcomp(provinces.cov.2, center = TRUE, scale. = TRUE)
+
+summary(prov.cov.pca.2)
+
+provinces.cov.2 <- provinces %>% 
+  select(idh, education_years, porc_essalud, mig_arrival_perc,
+         porc_fem, porc_65_plus, log_mort2, log_mort_cum, idh_low) %>% 
+  na.omit() %>% 
+  filter(!is.na(log_mort2)) %>% 
+  mutate(
+    x = prov.cov.pca.2$x[,1],
+    y = prov.cov.pca.2$x[,2]
+  )
+
+ggbiplot(
+  prov.cov.pca.2, 
+  obs.scale = 1, 
+  alpha = 0,
+  ellipse = TRUE,
+  groups = provinces.cov.2$idh_low
+  ) +
+  geom_point(
+    aes(x = x, y = y, size = log_mort2),
+    alpha = 0.5,
+    data = provinces.cov.2
+  ) +
+  theme_bw()
+
+# RT
+provinces.cov.3 <- provinces %>% 
+  filter(!is.na(rt)) %>% 
+  select(idh, education_years, porc_essalud, mig_arrival_perc,
+         porc_fem, porc_65_plus) %>% 
+  na.omit()
+
+prov.cov.pca.3 <- prcomp(provinces.cov.3, center = TRUE, scale. = TRUE)
+
+summary(prov.cov.pca.3)
+
+provinces.cov.3 <- provinces %>% 
+  select(idh, education_years, porc_essalud, mig_arrival_perc,
+         porc_fem, porc_65_plus, rt, log_mort_cum, idh_low) %>% 
+  na.omit() %>% 
+  filter(!is.na(rt)) %>% 
+  mutate(
+    x = prov.cov.pca.3$x[,1],
+    y = prov.cov.pca.3$x[,2]
+  )
+
+ggbiplot(
+  prov.cov.pca.3, 
+  obs.scale = 1, 
+  alpha = 0,
+  ellipse = TRUE,
+  groups = provinces.cov.3$idh_low
+) +
+  geom_point(
+    aes(x = x, y = y, size = rt),
+    alpha = 0.5,
+    data = provinces.cov.3
+  ) +
+  theme_bw()
 
 # Plots -------------------------------------------------------------------
 
