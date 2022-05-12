@@ -13,81 +13,24 @@ library(lubridate)
 # Read relevant data sources ----------------------------------------------
 
 # Population provinces
-poblacion_prov <- read.csv("data/poblacion_provincial_peru.csv") %>% 
-  group_by(dpt_cdc = DEPARTAMENTO,prov_cdc = PROVINCIA) %>% 
-  summarise(pob = sum(POBLACION)) %>% ungroup() %>%  select(prov_cdc, pob)
+poblacion_prov <- read.csv("data/pre_processed/poblacion_prov.csv") 
 
 # EsSalud insurance
-essalud <- read_excel("data/aseguramiento_essalud.xlsx", sheet = 1) %>% 
-  mutate(
-    prov_cdc = str_to_upper(stri_trans_general(prov_cdc, id = "Latin-ASCII")),
-    prov_cdc = case_when(
-      prov_cdc == "ANTONIO RAYMONDI" ~ "ANTONIO RAIMONDI",
-      prov_cdc == "MARANON" ~ "MARAÑON",
-      prov_cdc == "FERRENAFE" ~ "FERREÑAFE",
-      prov_cdc == "CANETE" ~ "CAÑETE",
-      prov_cdc == "DATEM DEL MARANON" ~ "DATEM DEL MARAÑON",
-      prov_cdc == "DANIEL A. CARRION" ~ "DANIEL ALCIDES CARRION",
-      TRUE ~ prov_cdc
-      )
-    ) %>% 
-  select(prov_cdc, porc_essalud)
+essalud <- read.csv("data/pre_processed/essalud.csv")
 
 # Provincial (Adm2) maps
-map_prov <- read_sf("data/provincias/PROVINCIAS.shp") %>% 
-  rename(prov_cdc = PROVINCIA) %>% 
-  mutate(prov_cdc = ifelse(
-    prov_cdc == "ANTONIO RAYMONDI", "ANTONIO RAIMONDI", prov_cdc)
-  ) %>% 
-  mutate(prov_cdc = ifelse(
-    prov_cdc == "NASCA", "NAZCA", prov_cdc)
-  )
+map_prov <- readRDS("data/pre_processed/map_prov.RDS")
 
 # HDI United nations
-idh <- read_excel("data/IDH%202019.xlsx", sheet = 3, skip = 2, n_max = 200) %>% 
-  clean_names() %>% 
-  select(
-    prov_cdc = x3, 
-    pop = poblacion, 
-    idh = indice_de_desarrollo_humano,
-    life_exp = esperanza_de_vida_al_nacer,
-    perc_secondary = con_educacion_secundaria_completa_poblac_18_anos,
-    education_years = anos_de_educacion_poblac_25_y_mas,
-    household_per_capita_income = ingreso_familiar_per_capita
-  ) %>% 
-  na.omit() %>% 
-  mutate(
-    prov_cdc = str_to_upper(
-      stri_trans_general(prov_cdc, id = "Latin-ASCII")
-    )
-  ) %>% 
-  mutate(
-    prov_cdc = case_when(
-      prov_cdc == "ANTONIO RAYMONDI" ~ "ANTONIO RAIMONDI",
-      prov_cdc == "MARANON" ~ "MARAÑON",
-      prov_cdc == "FERRENAFE" ~ "FERREÑAFE",
-      prov_cdc == "CANETE" ~ "CAÑETE",
-      prov_cdc == "DATEM DEL MARANON" ~ "DATEM DEL MARAÑON",
-      prov_cdc == "DANIEL A. CARRION" ~ "DANIEL ALCIDES CARRION",
-      TRUE ~ prov_cdc
-    )
-  ) %>% 
-  mutate_at(vars(2:7), ~as.numeric(.))
+HDI <- read.csv("data/pre_processed/HDI.csv")
 
 # Read predicted mortality time series 
-provinces <- read.csv("data/pred_prov_time_series.csv") %>% 
-  mutate(day = round(x1 * 7, digits = 1), .after = x1) %>% 
-  filter(day %in% 0:560) %>% 
-  distinct(day, prov_cdc, .keep_all = TRUE) %>% 
-  tibble() %>% 
-  select(day, prov_cdc, dpt_cdc, pred, mortality) %>% 
-  mutate(date = as_date(day + 18323), .before = day) %>% 
-  filter(between(date, as_date("2020-03-02"), as_date("2021-06-30")))
+prov_pred_daily_mort <- read.csv("data/pre_processed/prov_pred_daily_mort.csv")
   
-prov_preds_complete <- provinces %>% 
+prov_preds_complete <- prov_pred_daily_mort %>% 
   split(.$prov_cdc)
 
-provinces_list <- provinces %>% 
+provinces_list <- prov_pred_daily_mort %>% 
   distinct(dpt_cdc, prov_cdc)
 
 
@@ -162,7 +105,7 @@ provinces_final <- provinces_list %>%
   left_join(second_peak) %>% 
   left_join(n_peak) %>% 
   mutate(dist_peaks = day_second_peak - day_first_peak) %>% 
-  left_join(idh) 
+  left_join(HDI) 
 
 write.csv(provinces_final, "output/provinces_final.csv", row.names = FALSE)
 
@@ -173,7 +116,7 @@ library(GGally)
 provinces_final %>% 
   # filter(!(prov_cdc %in% c("LIMA"))) %>% 
   select(porc_essalud, day_first_peak, mort_first_peak, day_second_peak,
-         mort_second_peak, idh) %>% 
+         mort_second_peak, HDI) %>% 
   ggpairs(
     lower = list(
       continuous = wrap("points", size = 0.5, alpha = 0.5),
@@ -183,7 +126,7 @@ provinces_final %>%
 
 # provinces_final %>% 
 #   select(porc_essalud, day_first_peak, mort_first_peak, day_second_peak,
-#          mort_second_peak, idh) %>% 
+#          mort_second_peak, HDI) %>% 
 #   # select(day_first_peak:household_per_capita_income) %>% 
 #   ggpairs(
 #     aes(color = day_first_peak < 250),

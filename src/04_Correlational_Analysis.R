@@ -67,7 +67,8 @@ provinces <- provinces %>%
     dens_pop = pop / area,
     log_mort1 = mort_first_peak,
     log_mort2 = mort_second_peak,
-    idh_low = idh < 0.42
+    idh_low = idh < 0.42,
+    dens_pop = as.numeric(dens_pop)
   ) %>% 
   tibble() %>% 
   select(
@@ -75,7 +76,7 @@ provinces <- provinces %>%
     n_peak, dist_peaks, rt, day_rt = day, idh, idh_low, education_years, 
     porc_essalud, mob, mig_arrival_perc, dens_pop, porc_fem, porc_65_plus
   )
-  
+
 
 # Modeling features by covariates ----------------------------------------
 provinces.na <- provinces[,c(2,3,5,9)] %>% 
@@ -121,7 +122,7 @@ mod.mort.2 <- lm(
 summary(mod.mort.2)
 
 mod.rt <- lm(
-  rt ~  mig_arrival_perc + idh_low + porc_essalud + porc_fem + porc_65_plus, 
+  rt ~  mig_arrival_perc + idh + porc_essalud + porc_fem + porc_65_plus, 
   data = provinces.na
 )
 
@@ -133,7 +134,7 @@ summary(mod.rt)
 # First Peak
 provinces.cov.1 <- provinces %>% 
   select(idh, education_years, porc_essalud, mig_arrival_perc,
-         porc_fem, porc_65_plus) %>% 
+         porc_fem, porc_65_plus, dens_pop) %>% 
   na.omit()
 
 prov.cov.pca.1 <- prcomp(provinces.cov.1, center = TRUE, scale. = TRUE)
@@ -167,7 +168,7 @@ ggbiplot(
 provinces.cov.2 <- provinces %>% 
   filter(!is.na(log_mort2)) %>% 
   select(idh, education_years, porc_essalud, mig_arrival_perc,
-         porc_fem, porc_65_plus) %>% 
+         porc_fem, porc_65_plus, dens_pop) %>% 
   na.omit()
 
 prov.cov.pca.2 <- prcomp(provinces.cov.2, center = TRUE, scale. = TRUE)
@@ -202,7 +203,7 @@ ggbiplot(
 provinces.cov.3 <- provinces %>% 
   filter(!is.na(rt)) %>% 
   select(idh, education_years, porc_essalud, mig_arrival_perc,
-         porc_fem, porc_65_plus) %>% 
+         porc_fem, porc_65_plus, dens_pop) %>% 
   na.omit()
 
 prov.cov.pca.3 <- prcomp(provinces.cov.3, center = TRUE, scale. = TRUE)
@@ -486,6 +487,17 @@ provinces %>%
       x = porc_essalud, 
       y = rt,
       color = idh < 0.42
+    )
+  ) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Rt vs essalud | idh
+provinces %>% 
+  ggplot(
+    aes(
+      x = porc_essalud, 
+      y = rt
     )
   ) +
   geom_point() +
