@@ -40,7 +40,11 @@ provinces <- provinces %>%
     med_ratio = medico / pop,
     enf_ratio = enfermero / pop,
     bed_ratio = beds / pop,
-    med2_ratio = physicians / pop
+    med2_ratio = physicians / pop,
+    log_essalud = log(perc_essalud),
+    log_mig_in = log(mig_in_perc),
+    log_pop_dens = log(dens_pop),
+    log_med_ratio = log(med_ratio)
   ) %>% 
   tibble() %>% 
   select(
@@ -48,12 +52,12 @@ provinces <- provinces %>%
     day_second_peak, n_peak, dist_peaks, rt, day_rt = day, HDI, HDI_low,
     education_years, perc_essalud, mob, mig_in_perc, mig_out_perc, dens_pop,
     perc_fem, perc_65_plus, med_ratio, enf_ratio, altitud, ide, ocup_perc,
-    bed_ratio, med2_ratio
+    bed_ratio, med2_ratio, log_essalud, log_pop_dens, log_med_ratio
   )
 
 # Modeling features by covariates ----------------------------------------
-cov <- "~ mig_in_perc + HDI + dens_pop + perc_essalud +
-          perc_fem + perc_65_plus + med_ratio + ide + altitud"
+cov <- "~ mig_in_perc + HDI + log_pop_dens + log_essalud +
+          perc_fem + perc_65_plus + log_med_ratio + ide + altitud + bed_ratio"
 
 mod.mort.cum <- lm(formula(paste("log_mort_cum", cov)), data = provinces)
 summary(mod.mort.cum)
@@ -61,15 +65,25 @@ summary(mod.mort.cum)
 mod.mort.1 <- lm(formula(paste("log_mort1", cov)), data = provinces)
 summary(mod.mort.1)
 
+mod.peak.1 <- lm(formula(paste("day_first_peak", cov)), data = provinces)
+summary(mod.mort.1)
+
 mod.mort.2 <- lm(formula(paste("log_mort2", cov)), data = provinces)
 summary(mod.mort.2)
+
+mod.peak.2 <- lm(formula(paste("day_second_peak", cov)), data = provinces)
+summary(mod.mort.1)
+
+mod.dist.peak <- lm(formula(paste("dist_peaks", cov)), data = provinces)
+summary(mod.mort.1)
 
 mod.rt <- lm(formula(paste("rt", cov)), data = provinces)
 summary(mod.rt)
 
 # PCA covariates ----------------------------------------------------------
-vars <- c("HDI", "education_years", "perc_essalud", "mig_in_perc", 
-          "perc_fem", "perc_65_plus", "dens_pop", "med_ratio", "altitud")
+vars <- c("HDI", "education_years", "log_essalud", "mig_in_perc", 
+          "perc_fem", "perc_65_plus", "log_pop_dens", "log_med_ratio",
+          "altitud")
 
 # First Peak
 provinces.cov.1 <- provinces %>% 
@@ -173,6 +187,12 @@ provinces.cov.1 %>%
 # Mortality cumulative vs Migration in | HDI
 provinces %>% 
   ggplot(aes(x = mig_in_perc, y = log_mort_cum, color = HDI_low)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Mortality cumulative vs Migration in | altitud
+provinces %>% 
+  ggplot(aes(x = mig_in_perc, y = log_mort_cum, color = altitud < 2000)) +
   geom_point() +
   geom_smooth(method = "lm")
 
