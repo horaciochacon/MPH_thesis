@@ -28,10 +28,11 @@ read_excel("data/aseguramiento_essalud.xlsx", sheet = 1) %>%
       TRUE ~ prov_cdc
     )
   ) %>% 
-  select(prov_cdc, porc_essalud) %>% 
+  select(prov_cdc, perc_essalud = porc_essalud) %>% 
   write.csv("data/pre_processed/essalud.csv", row.names = FALSE)
 
 # Provincial (Adm2) maps --------------------------------------------------
+sf_use_s2(FALSE)
 read_sf("data/provincias/PROVINCIAS.shp") %>% 
   rename(prov_cdc = PROVINCIA) %>% 
   mutate(prov_cdc = ifelse(
@@ -144,8 +145,8 @@ pop_sex <- read.csv("data/TB_POBLACION_INEI.csv") %>%
   group_by(provincia, sexo) %>% 
   summarise(pop = sum(cantidad)) %>% 
   pivot_wider(names_from = sexo, values_from = pop) %>% 
-  mutate(porc_fem = `F` / (M + `F`)) %>% 
-  select(prov_cdc = provincia, porc_fem)
+  mutate(perc_fem = `F` / (M + `F`)) %>% 
+  select(prov_cdc = provincia, perc_fem)
 
 pop_65_plus <- read.csv("data/TB_POBLACION_INEI.csv") %>% 
   clean_names() %>% 
@@ -155,9 +156,9 @@ pop_65_plus <- read.csv("data/TB_POBLACION_INEI.csv") %>%
   pivot_wider(names_from = edad_anio, values_from = pop) %>% 
   rowwise() %>% 
   mutate(
-    porc_65_plus = sum(across(`65-69`:`80  +`)) / sum(across(`0-19`:`80  +`))
+    perc_65_plus = sum(across(`65-69`:`80  +`)) / sum(across(`0-19`:`80  +`))
   ) %>% 
-  select(prov_cdc = provincia, porc_65_plus)
+  select(prov_cdc = provincia, perc_65_plus)
 
 pop_sex %>% 
   left_join(pop_65_plus) %>% 

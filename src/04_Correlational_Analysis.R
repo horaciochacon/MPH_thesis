@@ -6,158 +6,92 @@ library(sf)
 library(units)
 library(janitor)
 library(tidyr)
+library(corrplot)
 
 
 # Read curated datasets ---------------------------------------------------
-pop_cov <- read.csv("data/pre_processed/pop_cov.csv")
-
-map_prov <- read.csv("data/pre_processed/map_prov.csv")
-
+pop_cov   <- read.csv("data/pre_processed/pop_cov.csv")
+map_prov  <- read.csv("data/pre_processed/map_prov.csv")
 provinces <- read.csv("output/provinces_final.csv")
-
-rt <- read.csv("output/rt_peak_df.csv")
-
+rt        <- read.csv("output/rt_peak_df.csv")
 migration <- read.csv("data/pre_processed/migration.csv")
 
-
 # Processing final Provincial Dataset -------------------------------------
-
 provinces <- provinces %>% 
   left_join(migration) %>% 
   left_join(rt) %>% 
   left_join(map_prov) %>% 
   left_join(pop_cov) %>% 
   mutate(
-    mig_arrival_perc = retor_llegaron / pop,
+    mig_in_perc = retor_llegaron / pop,
+    mig_out_perc = retor_salieron / pop,
     log_mort_cum = log(deaths / pop),
     dens_pop = pop / area,
     log_mort1 = mort_first_peak,
     log_mort2 = mort_second_peak,
-    HDI_low = HDI < 0.42,
+    HDI_low = ifelse(HDI < 0.42, "Low HDI", "High HDI"),
     dens_pop = as.numeric(dens_pop)
   ) %>% 
   tibble() %>% 
   select(
-    prov_cdc, log_mort_cum, log_mort1, day_first_peak, log_mort2, day_second_peak,
-    n_peak, dist_peaks, rt, day_rt = day, HDI, HDI_low, education_years, 
-    porc_essalud, mob, mig_arrival_perc, dens_pop, porc_fem, porc_65_plus
+    prov_cdc, log_mort_cum, log_mort1, day_first_peak, log_mort2,
+    day_second_peak, n_peak, dist_peaks, rt, day_rt = day, HDI, HDI_low,
+    education_years, perc_essalud, mob, mig_in_perc, mig_out_perc, dens_pop,
+    perc_fem, perc_65_plus
   )
-
 
 # Modeling features by covariates ----------------------------------------
-provinces.na <- provinces[,c(2,3,5,9)] %>% 
-  na.omit()
+cov <- "~ mig_in_perc + mig_out_perc + HDI + dens_pop + perc_essalud +
+                  perc_fem + perc_65_plus"
 
-prov.pca <- prcomp(provinces.na, center = TRUE, scale. = TRUE)
- 
-summary(prov.pca)
-
-provinces.na <- provinces %>% 
-  filter(
-    prov_cdc %in%  (provinces[,c(1,2,3,5,9)] %>% na.omit() %>% .$prov_cdc),
-    ) %>% 
-  mutate(pca = prov.pca$x[,1])
-  
-
-mod1 <- lm(
-  pca ~ mig_arrival_perc + idh + dens_pop + porc_essalud + porc_fem + porc_65_plus, 
-  data = provinces.na
-  )
-
-summary(mod1)
-
-mod.mort.cum <- lm(
-  log_mort_cum ~ mig_arrival_perc + idh + dens_pop + porc_essalud + porc_fem + porc_65_plus, 
-  data = provinces.na
-)
-
+mod.mort.cum <- lm(formula(paste("log_mort_cum", cov)), data = provinces)
 summary(mod.mort.cum)
 
-mod.mort.1 <- lm(
-  log_mort1 ~ mig_arrival_perc + idh + dens_pop + porc_essalud + porc_fem + porc_65_plus, 
-  data = provinces.na
-)
-
+mod.mort.1 <- lm(formula(paste("log_mort1", cov)), data = provinces)
 summary(mod.mort.1)
 
-mod.mort.2 <- lm(
-  log_mort2 ~ mig_arrival_perc + idh + dens_pop + porc_essalud + porc_fem + porc_65_plus, 
-  data = provinces.na
-)
-
+mod.mort.2 <- lm(formula(paste("log_mort2", cov)), data = provinces)
 summary(mod.mort.2)
 
-mod.rt <- lm(
-  rt ~  mig_arrival_perc + idh + porc_essalud + porc_fem + porc_65_plus, 
-  data = provinces.na
-)
-
+mod.rt <- lm(formula(paste("rt", cov)), data = provinces)
 summary(mod.rt)
 
-
 # PCA covariates ----------------------------------------------------------
+vars <- c("HDI", "education_years", "perc_essalud", "mig_in_perc", "mig_out_perc",
+               "perc_fem", "perc_65_plus", "dens_pop")
 
 # First Peak
 provinces.cov.1 <- provinces %>% 
-  select(idh, education_years, porc_essalud, mig_arrival_perc,
-         porc_fem, porc_65_plus, dens_pop) %>% 
-  na.omit()
+  select(all_of(vars))
 
-prov.cov.pca.1 <- prcomp(provinces.cov.1, center = TRUE, scale. = TRUE)
-
-summary(prov.cov.pca.1)
-
+prov.cov.pca.1 <- prcomp(provinces.cov.1, center = TRUE, scale = TRUE)
 provinces.cov.1 <- provinces %>% 
-  select(idh, education_years, porc_essalud, mig_arrival_perc,
-         porc_fem, porc_65_plus, log_mort1, log_mort_cum, idh_low) %>% 
-  na.omit() %>% 
-  mutate(
-    x = prov.cov.pca.1$x[,1],
-    y = prov.cov.pca.1$x[,2]
-  )
+  mutate(pc.1 = prov.cov.pca.1$x[,1], pc.2 = prov.cov.pca.1$x[,2])
 
-ggbiplot(
-  prov.cov.pca.1, 
-  obs.scale = 1, 
-  alpha = 0,
-  ellipse = TRUE,
-  groups = provinces.cov.1$idh_low
-  ) +
+ggbiplot(prov.cov.pca.1, obs.scale = 1, alpha = 0, ellipse = TRUE,
+  groups = provinces.cov.1$HDI_low) +
   geom_point(
-    aes(x = x, y = y, size = log_mort1),
+    aes(x = pc.1, y = pc.2, size = log_mort1),
     alpha = 0.5,
-    data = provinces.cov.1
-    ) +
+    data = provinces.cov.1) +
   theme_bw()
 
 # Second Peak
 provinces.cov.2 <- provinces %>% 
   filter(!is.na(log_mort2)) %>% 
-  select(idh, education_years, porc_essalud, mig_arrival_perc,
-         porc_fem, porc_65_plus, dens_pop) %>% 
-  na.omit()
+  select(all_of(vars)) 
 
-prov.cov.pca.2 <- prcomp(provinces.cov.2, center = TRUE, scale. = TRUE)
-
-summary(prov.cov.pca.2)
-
+prov.cov.pca.2 <- prcomp(provinces.cov.2, center = TRUE, scale = TRUE)
 provinces.cov.2 <- provinces %>% 
-  select(idh, education_years, porc_essalud, mig_arrival_perc,
-         porc_fem, porc_65_plus, log_mort2, log_mort_cum, idh_low) %>% 
+  select(all_of(vars), log_mort2, HDI_low) %>% 
   na.omit() %>% 
-  filter(!is.na(log_mort2)) %>% 
   mutate(
     x = prov.cov.pca.2$x[,1],
     y = prov.cov.pca.2$x[,2]
   )
 
-ggbiplot(
-  prov.cov.pca.2, 
-  obs.scale = 1, 
-  alpha = 0,
-  ellipse = TRUE,
-  groups = provinces.cov.2$idh_low
-  ) +
+ggbiplot(prov.cov.pca.2, obs.scale = 1, alpha = 0, ellipse = TRUE,
+  groups = provinces.cov.2$HDI_low) +
   geom_point(
     aes(x = x, y = y, size = log_mort2),
     alpha = 0.5,
@@ -168,31 +102,19 @@ ggbiplot(
 # RT
 provinces.cov.3 <- provinces %>% 
   filter(!is.na(rt)) %>% 
-  select(idh, education_years, porc_essalud, mig_arrival_perc,
-         porc_fem, porc_65_plus, dens_pop) %>% 
-  na.omit()
+  select(all_of(vars))
 
 prov.cov.pca.3 <- prcomp(provinces.cov.3, center = TRUE, scale. = TRUE)
-
-summary(prov.cov.pca.3)
-
 provinces.cov.3 <- provinces %>% 
-  select(idh, education_years, porc_essalud, mig_arrival_perc,
-         porc_fem, porc_65_plus, rt, log_mort_cum, idh_low) %>% 
-  na.omit() %>% 
+  select(all_of(vars), HDI_low, rt) %>% 
   filter(!is.na(rt)) %>% 
   mutate(
     x = prov.cov.pca.3$x[,1],
     y = prov.cov.pca.3$x[,2]
   )
 
-ggbiplot(
-  prov.cov.pca.3, 
-  obs.scale = 1, 
-  alpha = 0,
-  ellipse = TRUE,
-  groups = provinces.cov.3$idh_low
-) +
+ggbiplot(prov.cov.pca.3, obs.scale = 1, alpha = 0, ellipse = TRUE,
+         groups = provinces.cov.3$HDI_low) +
   geom_point(
     aes(x = x, y = y, size = rt),
     alpha = 0.5,
@@ -203,269 +125,138 @@ ggbiplot(
 # Plots -------------------------------------------------------------------
 
 #Correlation Matrix
-provinces.na %>% 
+provinces %>% 
   select(
-    log_mort_cum:day_second_peak, day_rt:idh, education_years:porc_essalud,
-    mig_arrival_perc,porc_fem:porc_65_plus
-    ) %>% cor() %>% 
-corrplot(type = "upper", method = "square", diag = FALSE, insig='blank',
-         addCoef.col ='black', number.cex = 0.8, order = 'AOE')
+    log_mort_cum:day_second_peak, day_rt:HDI, education_years:perc_essalud,
+    mig_in_perc,mig_out_perc, perc_fem:perc_65_plus
+    ) %>%
+  cor(use =  "complete.obs") %>% 
+  corrplot(type = "upper", method = "square", diag = FALSE, insig='blank',
+           addCoef.col ='black', number.cex = 0.8, order = 'AOE')
 
+# log_mort1 vs pc1
+provinces.cov.1 %>% 
+  ggplot(aes(x = pc.1, y = log_mort1)) +
+  geom_point() +
+  geom_smooth(method = "lm")
 
+# log_mort1 vs pc2
+provinces.cov.1 %>%
+  ggplot(aes(x = pc.2, y = log_mort1, col = HDI_low)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# log_mort2 vs pc1
+provinces.cov.1 %>% 
+  ggplot(aes(x = pc.1, y = log_mort2)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# log_mort2 vs pc2
+provinces.cov.1 %>% 
+  ggplot(aes(x = pc.2, y = log_mort2)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Mortality cumulative vs Migration in | HDI
 provinces %>% 
-  ggplot(aes(x = mig_arrival_perc, y = log_mort1)) +
+  ggplot(aes(x = mig_in_perc, y = log_mort_cum, color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# pca vs Migration | idh
-provinces.na %>% 
-  ggplot(
-    aes(
-      x = mig_arrival_perc, 
-      y = pca,
-      color = idh < 0.42
-    )
-  ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-# pca vs mobility | idh
-provinces.na %>% 
-  ggplot(
-    aes(
-      x = mob, 
-      y = pca,
-      color = idh < 0.42
-    )
-  ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-# pca vs essalud | idh
-provinces.na %>% 
-  ggplot(
-    aes(
-      x = porc_essalud, 
-      y = pca,
-      color = idh < 0.42
-    )
-  ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-# pca vs 65 plus | idh
-provinces.na %>% 
-  ggplot(
-    aes(
-      x = porc_65_plus, 
-      y = pca,
-      color = idh < 0.42
-    )
-  ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-
-# Mortality cummulative vs Migration | idh
+# Mortality cumulative vs mobility | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = mig_arrival_perc, 
-      y = log_mort_cum,
-      color = idh < 0.42
-    )
-  ) +
+  ggplot(aes(x = mob, y = log_mort_cum, color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Mortality cummulative vs mobility | idh
+# Mortality cumulative vs EsSalud | HDI
+provinces %>% 
+  ggplot(aes(x = perc_essalud, y = log_mort_cum, color = HDI_low)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Mortality cumulative vs Pop density | HDI
+provinces %>% 
+  ggplot(aes(x = log(dens_pop), y = log_mort_cum, color = HDI_low)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Mortality first peak vs Migration | HDI
+provinces %>% 
+  ggplot(aes(x = mig_in_perc, y = log_mort1, color = HDI_low)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Mortality first peak vs mobility | HDI
+provinces %>% 
+  ggplot(aes(x = mob, y = log_mort1, color = HDI_low)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Mortality first peak vs EsSalud | HDI
 provinces %>% 
   ggplot(
     aes(
-      x = mob, 
-      y = log_mort_cum,
-      color = idh < 0.42
-    )
-  ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-# Mortality cummulative vs essalud | idh
-provinces %>% 
-  ggplot(
-    aes(
-      x = porc_essalud, 
-      y = log_mort_cum,
-      color = idh < 0.42
-    )
-  ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-# Mortality cummulative vs Pop density | idh
-provinces %>% 
-  ggplot(
-    aes(
-      x = log(dens_pop), 
-      y = log_mort_cum,
-      color = idh < 0.42
-    )
-  ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-# Mortality first peak vs Migration | idh
-provinces %>% 
-  ggplot(
-    aes(
-      x = mig_arrival_perc, 
+      x = perc_essalud, 
       y = log_mort1,
-      color = idh < 0.42
-      )
-    ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-# Mortality first peak vs mobility | idh
-provinces %>% 
-  ggplot(
-    aes(
-      x = mob, 
-      y = log_mort1,
-      color = idh < 0.42
+      color = HDI_low
     )
   ) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Mortality first peak vs essalud | idh
+# Mortality first peak vs Pop density | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = porc_essalud, 
-      y = log_mort1,
-      color = idh < 0.42
-    )
-  ) +
+  ggplot(aes(x = log(dens_pop), y = log_mort1,color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Mortality first peak vs Pop density | idh
+# Mortality second peak vs migration | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = log(dens_pop), 
-      y = log_mort1,
-      color = idh < 0.42
-    )
-  ) +
+  ggplot(aes(x = mig_in_perc, y = log_mort2,color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Mortality second peak vs migration | idh
+# Mortality second peak vs mobility | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = mig_arrival_perc, 
-      y = log_mort2,
-      color = idh < 0.42
-    )
-  ) +
+  ggplot(aes(x = mob, y = log_mort2, color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Mortality second peak vs mobility | idh
+# Mortality second peak vs EsSalud | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = mob, 
-      y = log_mort2,
-      color = idh < 0.42
-    )
-  ) +
+  ggplot(aes(x = perc_essalud, y = log_mort2, color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Mortality second peak vs essalud | idh
+# Mortality second peak vs Pop density | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = porc_essalud, 
-      y = log_mort2,
-      color = idh < 0.42
-    )
-  ) +
+  ggplot(aes(x = log(dens_pop), y = log_mort2, color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Mortality second peak vs Pop density | idh
+# Day first peak vs Migration | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = log(dens_pop), 
-      y = log_mort2,
-      color = idh < 0.42
-    )
-  ) +
+  ggplot(aes(x = mig_in_perc, y = day_first_peak, color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Day first peak vs Migration | idh
+# Day second peak vs Migration  | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = mig_arrival_perc, 
-      y = day_first_peak,
-      color = idh < 0.42
-    )
-  ) +
+  ggplot(aes(x = mig_in_perc, y = day_second_peak,color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Day second peak vs Migration  | idh
+# Distance between peaks vs Mortality second peak | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = mig_arrival_perc, 
-      y = day_second_peak,
-      color = idh < 0.42
-    )
-  ) +
+  ggplot(aes(x = log_mort2, y = dist_peaks, color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-# Dist Peaks
+# Rt vs EsSalud | HDI
 provinces %>% 
-  ggplot(
-    aes(
-      x = mig_arrival_perc, 
-      y = dist_peaks,
-      color = idh < 0.42
-    )
-  ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-# Rt vs essalud | idh
-provinces %>% 
-  ggplot(
-    aes(
-      x = porc_essalud, 
-      y = rt,
-      color = idh < 0.42
-    )
-  ) +
-  geom_point() +
-  geom_smooth(method = "lm")
-
-# Rt vs essalud | idh
-provinces %>% 
-  ggplot(
-    aes(
-      x = porc_essalud, 
-      y = rt
-    )
-  ) +
+  ggplot(aes(x = perc_essalud, y = rt, color = HDI_low)) +
   geom_point() +
   geom_smooth(method = "lm")
 
