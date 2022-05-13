@@ -9,71 +9,37 @@ library(tidyr)
 
 
 # Read curated datasets ---------------------------------------------------
-pop_sex <- read.csv("data/TB_POBLACION_INEI.csv") %>% 
-  clean_names() %>% 
-  group_by(provincia, sexo) %>% 
-  summarise(pop = sum(cantidad)) %>% 
-  pivot_wider(names_from = sexo, values_from = pop) %>% 
-  mutate(porc_fem = `F` / (M + `F`)) %>% 
-  select(prov_cdc = provincia, porc_fem)
+pop_cov <- read.csv("data/pre_processed/pop_cov.csv")
 
-pop_65_plus <- read.csv("data/TB_POBLACION_INEI.csv") %>% 
-  clean_names() %>% 
-  mutate(edad_anio = ifelse(edad_anio %in% 0:19, "0-19", edad_anio)) %>% 
-  group_by(provincia, edad_anio) %>% 
-  summarise(pop = sum(cantidad)) %>% 
-  pivot_wider(names_from = edad_anio, values_from = pop) %>% 
-  rowwise() %>% 
-  mutate(
-    porc_65_plus = sum(across(`65-69`:`80  +`)) / sum(across(`0-19`:`80  +`))
-    ) %>% 
-  select(prov_cdc = provincia, porc_65_plus)
-
-sf_use_s2(FALSE)
-map_prov <- read_sf("data/provincias/PROVINCIAS.shp") %>% 
-  rename(prov_cdc = PROVINCIA) %>% 
-  mutate(prov_cdc = ifelse(
-    prov_cdc == "ANTONIO RAYMONDI", "ANTONIO RAIMONDI", prov_cdc)
-  ) %>% 
-  mutate(
-    prov_cdc = ifelse(prov_cdc == "NASCA", "NAZCA", prov_cdc),
-    area = st_area(geometry)
-  ) %>% 
-  select(prov_cdc, area) %>% 
-  st_drop_geometry()
-
+map_prov <- read.csv("data/pre_processed/map_prov.csv")
 
 provinces <- read.csv("output/provinces_final.csv")
+
 rt <- read.csv("output/rt_peak_df.csv")
-migration <- read_excel("data/RetProyProv.xls") %>% 
-  rename(prov_cdc = nomprov) %>% 
-  mutate(
-    prov_cdc = case_when(
-    prov_cdc == "NASCA" ~ "NAZCA",
-    prov_cdc == "ANTONIO RAYMONDI" ~ "ANTONIO RAIMONDI",
-    TRUE ~ prov_cdc
-    )
-  )
+
+migration <- read.csv("data/pre_processed/migration.csv")
+
+
+# Processing final Provincial Dataset -------------------------------------
 
 provinces <- provinces %>% 
   left_join(migration) %>% 
   left_join(rt) %>% 
   left_join(map_prov) %>% 
-  left_join(pop_sex) %>% 
-  left_join(pop_65_plus) %>% 
+  left_join(pop_cov) %>% 
   mutate(
     mig_arrival_perc = retor_llegaron / pop,
     log_mort_cum = log(deaths / pop),
     dens_pop = pop / area,
     log_mort1 = mort_first_peak,
     log_mort2 = mort_second_peak,
-    idh_low = idh < 0.42,
+    HDI_low = HDI < 0.42,
     dens_pop = as.numeric(dens_pop)
   ) %>% 
   tibble() %>% 
   select(
     prov_cdc, log_mort_cum, log_mort1, day_first_peak, log_mort2, day_second_peak,
-    n_peak, dist_peaks, rt, day_rt = day, idh, idh_low, education_years, 
+    n_peak, dist_peaks, rt, day_rt = day, HDI, HDI_low, education_years, 
     porc_essalud, mob, mig_arrival_perc, dens_pop, porc_fem, porc_65_plus
   )
 

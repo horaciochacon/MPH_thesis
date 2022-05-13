@@ -2,13 +2,6 @@ library(dplyr)
 source("R/functions.R")
 library(purrr)
 library(ggrepel)
-library(sf)
-library(janitor)
-library(stringr)
-library(stringi)
-library(readxl)
-library(lubridate)
-
 
 # Read relevant data sources ----------------------------------------------
 
@@ -139,13 +132,6 @@ provinces_final %>%
   select(day_first_peak:dist_peaks) %>% 
   ggpairs(aes(color = as.factor(n_peak)))
 
-
-
-
-
-
-
-
 # Map 196 provinces peaks
 for (i in 1:100) {
   g <- ggplot() +
@@ -201,7 +187,6 @@ for (i in 1:100) {
   # )
 }
 
-
 map_first_peak <- first_peak %>% 
   left_join(map_prov) %>% 
   ggplot() +
@@ -211,7 +196,7 @@ map_first_peak <- first_peak %>%
     fill = "white", size = 0.05, color = "grey40"
   ) +
   geom_sf(
-    aes(fill = x1, geometry = geometry), 
+    aes(fill = day_first_peak, geometry = geometry), 
     size = 0.05, color = "grey40", alpha = 1
   ) +
   scale_fill_distiller(
@@ -228,7 +213,7 @@ map_value_first_peak <- first_peak %>%
     fill = "white", size = 0.05, color = "grey40"
   ) +
   geom_sf(
-    aes(fill = mortality * 100000, geometry = geometry), 
+    aes(fill = mort_first_peak * 100000, geometry = geometry), 
     size = 0.05, color = "grey40", alpha = 1
   ) +
   scale_fill_distiller(
@@ -238,11 +223,39 @@ map_value_first_peak <- first_peak %>%
   ) +
   theme_bw()
 
-first_peak %>% 
-  # filter(x1 < 30) %>% 
-  ggplot(aes(x = x1, y = mortality)) +
-  geom_point() +
-  geom_smooth(method = "lm")
+map_second_peak <- second_peak %>% 
+  left_join(map_prov) %>% 
+  ggplot() +
+  geom_sf(
+    data = map_prov,
+    aes(geometry = geometry),
+    fill = "white", size = 0.05, color = "grey40"
+  ) +
+  geom_sf(
+    aes(fill = day_second_peak, geometry = geometry), 
+    size = 0.05, color = "grey40", alpha = 1
+  ) +
+  scale_fill_distiller(
+    palette = "Reds"
+  ) +
+  theme_bw()
 
- plot( first_peak$x1, first_peak$mortality)
+map_value_first_peak <- second_peak %>% 
+  left_join(map_prov) %>% 
+  ggplot() +
+  geom_sf(
+    data = map_prov,
+    aes(geometry = geometry),
+    fill = "white", size = 0.05, color = "grey40"
+  ) +
+  geom_sf(
+    aes(fill = mort_second_peak * 100000, geometry = geometry), 
+    size = 0.05, color = "grey40", alpha = 1
+  ) +
+  scale_fill_distiller(
+    direction = 1,
+    trans = "log",
+    breaks = c(0, 5, 20, 30, 50, 100)
+  ) +
+  theme_bw()
 

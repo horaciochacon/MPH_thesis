@@ -5,59 +5,19 @@ library(ggrepel)
 library(EpiEstim)
 library(incidence)
 library(lubridate)
-library(tidyr)
-library(stringr)
-library(stringi)
-library(janitor)
-
 
 # Reading the necessary data -----------------------------------------------
 
-# Province level population
-poblacion_prov <- read.csv("data/poblacion_provincial_peru.csv") %>% 
-  group_by(prov_cdc = PROVINCIA) %>% 
-  summarise(pob = sum(POBLACION)) 
+# Population provinces
+poblacion_prov <- read.csv("data/pre_processed/poblacion_prov.csv") 
 
-# Read Time-varying 
-peru_ifr <- read.csv("data/peru_ifr.csv") %>% 
-  as_tibble() %>%  mutate(date = as_date(date)) %>% 
-  filter(between(date, as_date("2020-03-02"), as_date("2021-06-30"))) %>% 
-  mutate(mean = ifelse(is.infinite(mean), NA, ifelse(mean==0,0.0161,mean))) %>% 
-  fill(mean, .direction = "up") %>% 
-  select(date, ifr = mean)
+# Time-varying IFR
+peru_ifr <- read.csv("data/pre_processed/peru_ifr_preprocessed.csv") %>% 
+  mutate(date = as.Date(date))
 
 # Mobility Reports
-mobility <- read.csv("data/2021_PE_Region_Mobility_Report.csv") %>% 
-  bind_rows(read.csv("data/2020_PE_Region_Mobility_Report.csv")) %>% 
-  filter(sub_region_2 != "") %>% 
-  select(prov_cdc = sub_region_2, date,
-         "retail_and_recreation_percent_change_from_baseline":
-           "residential_percent_change_from_baseline") %>% 
-  mutate(
-    prov_cdc = str_squish(
-      str_remove(str_remove_all(prov_cdc, "Province"), " of")
-    )
-  ) %>% 
-  mutate(
-    prov_cdc = str_to_upper(
-      stri_trans_general(prov_cdc, id = "Latin-ASCII")
-    ),
-    date = as_date(date)
-  ) %>% 
-  rowwise() %>% 
-  mutate(mob = mean(
-    c_across("retail_and_recreation_percent_change_from_baseline":
-               "residential_percent_change_from_baseline"), na.rm = TRUE),
-    prov_cdc = case_when(
-      prov_cdc == "FERRENAFE" ~ "FERREÑAFE",
-      prov_cdc == "CANETE" ~ "CAÑETE",
-      prov_cdc == "CONSTITUTIONAL CALLAO" ~ "CALLAO",
-      TRUE ~ prov_cdc
-      )
-    ) %>% 
-  select(prov_cdc, date, mob) %>% 
-  filter(between(date, as.Date("2020-03-02"), as.Date("2021-06-30"))) %>% 
-  arrange(prov_cdc, date)
+mobility <- read.csv("data/pre_processed/mobility.csv") %>% 
+  mutate(date = as.Date(date))
 
 # Read predicted mortality time series 
 prov_preds <- read.csv("data/pred_prov_time_series.csv") %>% 
