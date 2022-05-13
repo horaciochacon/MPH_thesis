@@ -175,3 +175,70 @@ read_excel("data/RetProyProv.xls") %>%
     )
   ) %>% 
   write.csv("data/pre_processed/migration.csv", row.names = FALSE)
+
+# InfoRHUS ----------------------------------------------------------------
+read_excel("data/INFORHUS_FEBRERO_2020.xlsx", skip = 3) %>% 
+  clean_names() %>% 
+  group_by(prov_cdc = provincia, grupo_final_2) %>% 
+  count() %>% 
+  filter(grupo_final_2 %in% c("Enfermero", "Médico")) %>% 
+  pivot_wider(names_from = grupo_final_2, values_from = n) %>% 
+  clean_names() %>% 
+  write.csv("data/pre_processed/inforhus.csv", row.names = FALSE)
+
+# Strategic planning data -------------------------------------------------
+read_excel("data/ceplan_data.xlsx", skip = 8) %>% 
+  clean_names() %>% 
+  select(
+    prov_cdc = region_provincia, 
+    densidad_2020, 
+    altitud = altitud_msnm_3,
+    ide = indice_de_densidad_del_estado_ide_2017_12,
+    pob_ocup = poblacion_ocupada_2017_18, 
+    pob2017 = poblacion_total_2017_1a
+  ) %>% 
+  mutate(
+    ocup_perc = pob_ocup / pob2017,
+    prov_cdc = str_to_upper(stri_trans_general(prov_cdc, id = "Latin-ASCII")),
+    prov_cdc = case_when(
+      prov_cdc == "ANTONIO RAYMONDI" ~ "ANTONIO RAIMONDI",
+      prov_cdc == "MARANON" ~ "MARAÑON",
+      prov_cdc == "FERRENAFE" ~ "FERREÑAFE",
+      prov_cdc == "CANETE" ~ "CAÑETE",
+      prov_cdc == "DATEM DEL MARANON" ~ "DATEM DEL MARAÑON",
+      prov_cdc == "DANIEL A. CARRION" ~ "DANIEL ALCIDES CARRION",
+      prov_cdc == "FAJARDO" ~ "VICTOR FAJARDO",
+      prov_cdc == "CARLOS F. FITZCARRALD" ~ "CARLOS FERMIN FITZCARRALD",
+      prov_cdc == "NASCA" ~ "NAZCA",
+      TRUE ~ prov_cdc
+    )
+  ) %>% 
+  write.csv("data/pre_processed/ceplan.csv", row.names = FALSE)
+
+
+
+
+
+
+
+
+# Susalud -----------------------------------------------------------------
+read.csv("data/ConsultaA_Recursos_Salud_2020_v7.csv") %>% 
+  filter(ANHO == 2020, MES == 2) %>% 
+  group_by(prov_cdc = PROVINCIA) %>% 
+  mutate(
+    CA_CAMAS = as.numeric(CA_CAMAS), 
+    CA_MEDICOS_TOTAL = as.numeric(CA_MEDICOS_TOTAL),
+    prov_cdc = case_when(
+      prov_cdc == "CA\xd1ETE" ~ "CAÑETE",
+      prov_cdc == "FERRE\xd1AFE" ~ "FERREÑAFE",
+      TRUE ~ prov_cdc
+      )
+    )%>% 
+  summarise(
+    beds = sum(CA_CAMAS, na.rm = TRUE),
+    physicians = sum(CA_MEDICOS_TOTAL, na.rm = TRUE)
+    ) %>% 
+  write.csv("data/pre_processed/susalud.csv", row.names = FALSE)
+
+
