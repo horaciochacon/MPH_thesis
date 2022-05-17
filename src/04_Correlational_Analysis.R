@@ -52,7 +52,8 @@ provinces <- provinces %>%
     day_second_peak, n_peak, dist_peaks, rt, day_rt = day, HDI, HDI_low,
     education_years, perc_essalud, mob, mig_in_perc, mig_out_perc, dens_pop,
     perc_fem, perc_65_plus, med_ratio, enf_ratio, altitud, ide, ocup_perc,
-    bed_ratio, med2_ratio, log_essalud, log_pop_dens, log_med_ratio
+    bed_ratio, med2_ratio, log_essalud, log_pop_dens, log_med_ratio,
+    deaths, pop
   )
 
 # Modeling features by covariates ----------------------------------------
@@ -81,7 +82,7 @@ mod.rt <- lm(formula(paste("rt", cov)), data = provinces)
 summary(mod.rt)
 
 # PCA covariates ----------------------------------------------------------
-vars <- c("HDI", "education_years", "log_essalud", "mig_in_perc", 
+vars <- c("HDI", "education_years", "log_essalud", "mig_in_perc", "ide",
           "perc_fem", "perc_65_plus", "log_pop_dens", "log_med_ratio",
           "altitud")
 
@@ -184,6 +185,13 @@ provinces.cov.1 %>%
   geom_point() +
   geom_smooth(method = "lm")
 
+# Mortality 1 vs mort 2
+provinces %>% 
+  ggplot(aes(x = log_mort1, y = log_mort2)) +
+  geom_point(aes(size = pop)) +
+  xlim(c(0, 0.0004)) +
+  geom_smooth(method = "lm")
+
 # Mortality cumulative vs Migration in | HDI
 provinces %>% 
   ggplot(aes(x = mig_in_perc, y = log_mort_cum, color = HDI_low)) +
@@ -214,7 +222,7 @@ provinces %>%
   geom_point() +
   geom_smooth(method = "lm")
 
-# Mortality cumulative vs Pop density | HDI
+# Mortality cumulative vs Altitude | HDI
 provinces %>% 
   ggplot(aes(x = altitud, y = log_mort_cum, color = HDI_low)) +
   geom_point() +
@@ -229,6 +237,18 @@ provinces %>%
 # Mortality first peak vs mobility | HDI
 provinces %>% 
   ggplot(aes(x = mob, y = log_mort1, color = HDI_low)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Mortality first peak vs 65+ | HDI
+provinces %>% 
+  ggplot(aes(x = perc_65_plus, y = log_mort1)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Mortality first peak vs 65+ | HDI
+provinces %>% 
+  ggplot(aes(x = perc_65_plus, y = log_mort2)) +
   geom_point() +
   geom_smooth(method = "lm")
 
@@ -250,6 +270,12 @@ provinces %>%
   geom_point() +
   geom_smooth(method = "lm")
 
+# Mortality first peak vs altitude | HDI
+provinces %>% 
+  ggplot(aes(x = altitud, y = log_mort1)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
 # Mortality second peak vs migration | HDI
 provinces %>% 
   ggplot(aes(x = mig_in_perc, y = log_mort2,color = HDI_low)) +
@@ -259,6 +285,12 @@ provinces %>%
 # Mortality second peak vs mobility | HDI
 provinces %>% 
   ggplot(aes(x = mob, y = log_mort2, color = HDI_low)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+# Mortality first peak vs altitude | HDI
+provinces %>% 
+  ggplot(aes(x = altitud, y = log_mort2)) +
   geom_point() +
   geom_smooth(method = "lm")
 
