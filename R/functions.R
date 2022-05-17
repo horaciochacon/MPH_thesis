@@ -86,6 +86,7 @@ geom_covid_gam <- function(k, title, label_df, nudge_y, ...) {
 # ggplot theme ------------------------------------------------------------
 
 goldenScatterCAtheme <- theme(
+  plot.title = element_text(hjust = 0.5),
   panel.background = element_rect(fill = "white"),
   aspect.ratio = ((1 + sqrt(5))/2)^(-1),
   axis.ticks.length = unit(0.5, "char"),
@@ -96,7 +97,7 @@ goldenScatterCAtheme <- theme(
   axis.title.x = element_text(size = 14, margin = margin(t = 7.5, r = 0, b = 0, l = 0)), 
   axis.ticks.y = element_blank(),
   axis.text.y = element_text(color = "black", size = 12, margin = margin(t = 0, r = -4, b = 0, l = 0)),
-  axis.title.y = element_text(size = 14,margin = margin(t = 0, r = 7.5, b = 0)),
+  axis.title.y = element_text(size = 10,margin = margin(t = 0, r = 7.5, b = 0)),
   legend.key = element_rect(fill = NA, color = NA),
   panel.grid.major.x = element_blank(),
   panel.grid.major.y = element_line(color = "gray45", size = 0.2),
@@ -107,3 +108,14 @@ goldenScatterCAtheme <- theme(
   panel.spacing.x = unit(1.25, "lines"), 
   panel.spacing.y = unit(1, "lines")
 )
+
+
+# Add UI base plot --------------------------------------------------------
+
+add_ui <- function(dat, x_var, lo_var, hi_var, color = "darkblue", opacity = 0.2) {
+  polygon(
+    x = c(dat[, x_var], rev(dat[, x_var])),
+    y = c(dat[, lo_var], rev(dat[, hi_var])),
+    col = adjustcolor(col = color, alpha.f = opacity), border = FALSE
+  )
+}
