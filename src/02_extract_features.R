@@ -30,12 +30,12 @@ provinces_list <- prov_pred_daily_mort %>%
 # Feature extraction and integration --------------------------------------
 
 # Split into province independent list of dataframes
-prov_preds <- prov_preds_complete %>%
+prov_preds_peaks <- prov_preds_complete %>%
   map(. %>% mutate(peak = get_peak_province(mortality, 2e-5, 2e-5)))
       
 
 # Extract first peak
-first_peak <- prov_preds %>% 
+first_peak <- prov_preds_peaks %>% 
   map(
     . %>% 
       filter(peak & day <= 300) %>% 
@@ -50,7 +50,7 @@ first_peak <- prov_preds %>%
   na.omit()
 
 # Extract second peak
-second_peak <- prov_preds %>% 
+second_peak <- prov_preds_peaks %>% 
   map(
     . %>% 
       filter(peak & day > 300) %>% 
@@ -65,7 +65,7 @@ second_peak <- prov_preds %>%
   na.omit()
 
 # Extract number of peaks
-n_peak <- prov_preds %>% 
+n_peak <- prov_preds_peaks %>% 
   map(
     . %>% 
       filter(peak) %>%
@@ -77,7 +77,7 @@ n_peak <- prov_preds %>%
   na.omit()
 
 # Extract cumulative deaths
-deaths <- prov_preds %>% 
+deaths <- prov_preds_peaks %>% 
   map(
     ~tibble(
       prov_cdc = .x %>% pull(prov_cdc) %>% unique(),
@@ -137,12 +137,12 @@ for (i in 1:100) {
   g <- ggplot() +
     geom_line(
       aes(x = day, y = mortality * 100000),
-      data = prov_preds[[i]], 
+      data = prov_preds_peaks[[i]], 
     ) +
     labs(
       title = paste(
-        prov_preds[[i]]$dpt_cdc[1],
-        prov_preds[[i]]$prov_cdc[1],
+        prov_preds_peaks[[i]]$dpt_cdc[1],
+        prov_preds_peaks[[i]]$prov_cdc[1],
         sep = " - "
       ),
       x = "Weeks",
@@ -150,25 +150,25 @@ for (i in 1:100) {
     ) +
     theme_bw()
   
-  if (sum(prov_preds[[i]]$peak) > 0) {
+  if (sum(prov_preds_peaks[[i]]$peak) > 0) {
     g <-  g +
       geom_label_repel(
         aes(x = day_first_peak, y = mort_first_peak * 100000, label = "peak"),
         nudge_y = 10,
         data =  first_peak %>%
-          filter(prov_cdc == unique(prov_preds[[i]]$prov_cdc)),
+          filter(prov_cdc == unique(prov_preds_peaks[[i]]$prov_cdc)),
         arrow = arrow(length = unit(0.015, "npc"))
       ) 
   }
   
   if (second_peak %>%
-      filter(prov_cdc == unique(prov_preds[[i]]$prov_cdc)) %>% nrow() > 0) {
+      filter(prov_cdc == unique(prov_preds_peaks[[i]]$prov_cdc)) %>% nrow() > 0) {
    g <- g +
       geom_label_repel(
         aes(x = day_second_peak, y = mort_second_peak * 100000, label = "peak"),
         nudge_y = 10,
         data =  second_peak %>%
-          filter(prov_cdc == unique(prov_preds[[i]]$prov_cdc)),
+          filter(prov_cdc == unique(prov_preds_peaks[[i]]$prov_cdc)),
         arrow = arrow(length = unit(0.015, "npc"))
       ) 
   }
@@ -178,9 +178,9 @@ for (i in 1:100) {
   # ggsave(
   #   filename = paste0(
   #     "plots/prov_peaks/",
-  #     tolower(prov_preds[[i]]$dpt_cdc[1]),
+  #     tolower(prov_preds_peaks[[i]]$dpt_cdc[1]),
   #     "_",
-  #     tolower(prov_preds[[i]]$prov_cdc[1]),
+  #     tolower(prov_preds_peaks[[i]]$prov_cdc[1]),
   #     ".pdf"),
   #   device = "pdf",
   #   plot = g

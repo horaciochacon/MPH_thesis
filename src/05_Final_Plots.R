@@ -1,5 +1,7 @@
 source("R/functions.R")
 library(stringr)
+library(ggpubr)
+library(viridis)
 
 # MR-BRT Plot -------------------------------------------------------------
 
@@ -139,4 +141,267 @@ for (i in depts) {
 
 # Feature extraction ------------------------------------------------------
 
+# Peaks
+
+provs <- "TAMBOPATA"
+for (i in provs) {
+  peak_graph <- ggplot() +
+    geom_line(
+      aes(x = day, y = mortality * 100000),
+      size = 1.5,
+      alpha = 0.8,
+      col = "#4363d8",
+      data = prov_preds_peaks[[i]], 
+    ) +
+    labs(
+      x = "Day",
+      y = "Weekly mortality rate / 100,000"
+    ) +
+    goldenScatterCAtheme +
+    theme(aspect.ratio = 9/25)
+  
+  if (sum(prov_preds_peaks[[i]]$peak) > 0) {
+    peak_graph <-  peak_graph +
+      geom_label_repel(
+        aes(x = day_first_peak, y = mort_first_peak * 100000, label = "peak"),
+        nudge_y = -5, nudge_x = 50,
+        data =  first_peak %>%
+          filter(prov_cdc == unique(prov_preds_peaks[[i]]$prov_cdc)),
+        arrow = arrow(length = unit(0.015, "npc"))
+      ) 
+  }
+  
+  if (second_peak %>%
+      filter(prov_cdc == unique(prov_preds_peaks[[i]]$prov_cdc)) %>% nrow() > 0) {
+    peak_graph <- peak_graph +
+      geom_label_repel(
+        aes(x = day_second_peak, y = mort_second_peak * 100000, label = "peak"),
+        nudge_y = 0, nudge_x = -50,
+        data =  second_peak %>%
+          filter(prov_cdc == unique(prov_preds_peaks[[i]]$prov_cdc)),
+        arrow = arrow(length = unit(0.015, "npc"))
+      ) 
+  }
+  print(peak_graph)
+}
+
+# RT
+
+rt_graph <- map2(
+  rt_list[provs], 
+  rt_peak[provs],
+  .f = 
+    ~estimate_R_plots(.x, what = "R") + 
+    geom_line(color = "#e6194b") +
+    geom_hline(yintercept = 1) +
+    labs(title = str_to_title(prov_preds_peaks[[i]]$prov_cdc[1]), x = NULL) +
+    geom_vline(xintercept = .y$t_end) +
+    coord_cartesian(
+      ylim = c(0,4)
+    ) +
+    goldenScatterCAtheme +
+    theme(aspect.ratio = 9/25)
+    
+)
+
+
+graph_features <- plot_grid(
+  rt_graph[[1]], 
+  peak_graph, 
+  nrow = 2, 
+  align = "v"
+  ) 
+
+
+# print(graph_log)
+print(graph_features)
+
+save_plot(
+  plot = graph_features,
+  filename =  paste0("plots/Presentation/Methods/Features.png"),
+  base_asp = 2,
+  scale = 2
+)
+
+# Maps features -----------------------------------------------------------
+map_prov <- readRDS("data/pre_processed/map_prov.RDS") %>% 
+  select(prov_cdc)
+provinces <- read.csv("output/provinces_final_covariates.csv") %>% 
+  left_join(map_prov) %>% 
+  as_tibble()
+
+
+# Peaks
+
+map_day_peak1 <- provinces %>% 
+  ggplot() +
+  geom_sf(
+    aes(geometry = geometry),
+    fill = "white", size = 0.05, color = "grey40"
+  ) +
+  geom_sf(
+    aes(fill = day_first_peak, geometry = geometry), 
+    size = 0.05, 
+    color = "grey40", 
+    alpha = 1
+  ) +
+  theme_map() +
+  theme(legend.position = "top") +
+  scale_fill_viridis(
+    option = "mako", 
+    direction = 1,
+    name = "Day of first peak",
+    guide = guide_colorbar(
+      direction = "horizontal",
+      barheight = unit(2, units = "mm"),
+      barwidth = unit(50, units = "mm"),
+      draw.ulim = F,
+      reverse = TRUE,
+      title.position = 'top',
+      title.hjust = 0.5
+      )
+    )
+
+map_mort_peak1 <- provinces %>% 
+  ggplot() +
+  geom_sf(
+    aes(geometry = geometry),
+    fill = "white", size = 0.05, color = "grey40"
+  ) +
+  geom_sf(
+    aes(fill = log_mort1, geometry = geometry), 
+    size = 0.05, 
+    color = "grey40", 
+    alpha = 1
+  ) +
+  theme_map() +
+  theme(legend.position = "top") +
+  scale_fill_viridis(
+    option = "mako", 
+    direction = -1,
+    name = "Log-Mortality rate first peak",
+    guide = guide_colorbar(
+      direction = "horizontal",
+      barheight = unit(2, units = "mm"),
+      barwidth = unit(50, units = "mm"),
+      draw.ulim = F,
+      title.position = 'top',
+      title.hjust = 0.5,
+      label.hjust = 0.5
+    )
+  )
+
+map_day_peak2 <- provinces %>% 
+  ggplot() +
+  geom_sf(
+    aes(geometry = geometry),
+    fill = "white", size = 0.05, color = "grey40"
+  ) +
+  geom_sf(
+    aes(fill = day_second_peak, geometry = geometry), 
+    size = 0.05, 
+    color = "grey40", 
+    alpha = 1
+  ) +
+  theme_map() +
+  theme(legend.position = "top") +
+  scale_fill_viridis(
+    option = "mako", 
+    direction = 1,
+    name = "Day of second peak",
+    guide = guide_colorbar(
+      direction = "horizontal",
+      barheight = unit(2, units = "mm"),
+      barwidth = unit(50, units = "mm"),
+      draw.ulim = F,
+      reverse = TRUE,
+      title.position = 'top',
+      title.hjust = 0.5,
+      label.hjust = 0.5
+    )
+  )
+
+map_mort_peak2 <- provinces %>% 
+  ggplot() +
+  geom_sf(
+    aes(geometry = geometry),
+    fill = "white", size = 0.05, color = "grey40"
+  ) +
+  geom_sf(
+    aes(fill = log_mort2, geometry = geometry), 
+    size = 0.05, 
+    color = "grey40", 
+    alpha = 1
+  ) +
+  theme_map() +
+  theme(legend.position = "top") +
+  scale_fill_viridis(
+    option = "mako", 
+    direction = -1,
+    name = "Log-Mortality rate second peak",
+    guide = guide_colorbar(
+      direction = "horizontal",
+      barheight = unit(2, units = "mm"),
+      barwidth = unit(50, units = "mm"),
+      draw.ulim = F,
+      title.position = 'top',
+      title.hjust = 0.5,
+      label.hjust = 0.5
+    )
+  )
+
+save_plot(
+  plot = map_day_peak1,
+  filename =  paste0("plots/Presentation/Results/map_day_peak1.png"),
+  scale = 1.5
+)
+
+save_plot(
+  plot = map_mort_peak1,
+  filename =  paste0("plots/Presentation/Results/map_mort_peak1.png"),
+  scale = 1.5
+)
+
+save_plot(
+  plot = map_day_peak2,
+  filename =  paste0("plots/Presentation/Results/map_day_peak2.png"),
+  scale = 1.5
+)
+
+save_plot(
+  plot = map_mort_peak2,
+  filename =  paste0("plots/Presentation/Results/map_mort_peak2.png"),
+  scale = 1.5
+)
+
+# RT
+
+map_day_peak1 <- provinces %>% 
+  ggplot() +
+  geom_sf(
+    aes(geometry = geometry),
+    fill = "white", size = 0.05, color = "grey40"
+  ) +
+  geom_sf(
+    aes(fill = day_first_peak, geometry = geometry), 
+    size = 0.05, 
+    color = "grey40", 
+    alpha = 1
+  ) +
+  theme_map() +
+  theme(legend.position = "top") +
+  scale_fill_viridis(
+    option = "mako", 
+    direction = 1,
+    name = "Day of first peak",
+    guide = guide_colorbar(
+      direction = "horizontal",
+      barheight = unit(2, units = "mm"),
+      barwidth = unit(50, units = "mm"),
+      draw.ulim = F,
+      reverse = TRUE,
+      title.position = 'top',
+      title.hjust = 0.5
+    )
+  )
 

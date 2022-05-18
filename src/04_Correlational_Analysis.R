@@ -33,8 +33,8 @@ provinces <- provinces %>%
     mig_out_perc = retor_salieron / pop,
     log_mort_cum = log(deaths / pop),
     dens_pop = pop / area,
-    log_mort1 = mort_first_peak,
-    log_mort2 = mort_second_peak,
+    log_mort1 = log(mort_first_peak),
+    log_mort2 = log(mort_second_peak),
     HDI_low = ifelse(HDI < 0.42, "Low HDI", "High HDI"),
     dens_pop = as.numeric(dens_pop),
     med_ratio = medico / pop,
@@ -53,8 +53,10 @@ provinces <- provinces %>%
     education_years, perc_essalud, mob, mig_in_perc, mig_out_perc, dens_pop,
     perc_fem, perc_65_plus, med_ratio, enf_ratio, altitud, ide, ocup_perc,
     bed_ratio, med2_ratio, log_essalud, log_pop_dens, log_med_ratio,
-    deaths, pop
+    deaths, pop, mort_first_peak, mort_second_peak
   )
+
+# write.csv(provinces, "output/provinces_final_covariates.csv", row.names = F)
 
 # Modeling features by covariates ----------------------------------------
 cov <- "~ mig_in_perc + HDI + log_pop_dens + log_essalud +
