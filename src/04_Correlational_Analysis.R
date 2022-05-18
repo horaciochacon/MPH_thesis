@@ -31,6 +31,7 @@ provinces <- provinces %>%
   mutate(
     mig_in_perc = retor_llegaron / pop,
     mig_out_perc = retor_salieron / pop,
+    mort_cum = deaths / pop,
     log_mort_cum = log(deaths / pop),
     dens_pop = pop / area,
     log_mort1 = log(mort_first_peak),
@@ -53,7 +54,7 @@ provinces <- provinces %>%
     education_years, perc_essalud, mob, mig_in_perc, mig_out_perc, dens_pop,
     perc_fem, perc_65_plus, med_ratio, enf_ratio, altitud, ide, ocup_perc,
     bed_ratio, med2_ratio, log_essalud, log_pop_dens, log_med_ratio,
-    deaths, pop, mort_first_peak, mort_second_peak
+    deaths, pop, mort_first_peak, mort_second_peak, log_mig_in, mort_cum
   )
 
 # write.csv(provinces, "output/provinces_final_covariates.csv", row.names = F)

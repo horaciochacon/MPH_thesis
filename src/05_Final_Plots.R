@@ -2,6 +2,7 @@ source("R/functions.R")
 library(stringr)
 library(ggpubr)
 library(viridis)
+library(scales)
 
 # MR-BRT Plot -------------------------------------------------------------
 
@@ -374,34 +375,360 @@ save_plot(
   scale = 1.5
 )
 
-# RT
 
-map_day_peak1 <- provinces %>% 
-  ggplot() +
-  geom_sf(
-    aes(geometry = geometry),
-    fill = "white", size = 0.05, color = "grey40"
+
+# Principal component analysis --------------------------------------------
+
+vars <- c(
+  "Human development index" = "HDI", 
+  "Years of education" = "education_years", 
+  "Prop. EsSalud (log)" = "log_essalud", 
+  "Incoming migration (log)" = "mig_in_perc", 
+  "Government density index" = "ide",
+  "Prop. female population" = "perc_fem", 
+  "Prop. 65 or older" = "perc_65_plus", 
+  "Population density (log)" = "log_pop_dens", 
+  "Med-pop ratio (log)" = "log_med_ratio",
+  "Altitude" = "altitud"
+  )
+mort_breaks <- c(5, 10, 20, 50)
+
+# First Peak
+provinces.cov.1 <- provinces %>% 
+  select(all_of(vars))
+
+prov.cov.pca.1 <- prcomp(provinces.cov.1, center = TRUE, scale = TRUE)
+  
+provinces.cov.1 <- provinces %>% 
+  select(all_of(vars), mort_first_peak, HDI_low) %>% 
+  mutate(pc.1 = prov.cov.pca.1$x[,1], pc.2 = prov.cov.pca.1$x[,2])
+
+graph_pca_mort1 <- ggbiplot(prov.cov.pca.1, obs.scale = 1, varname.size = 4, alpha = 0) +
+  geom_point(
+    aes(x = pc.1, y = pc.2, size = mort_first_peak * 1e5),
+    alpha = 0.55,
+    color = "#4363d8",
+    data = provinces.cov.1
+    ) +
+  scale_size(
+    trans = "log",
+    breaks = mort_breaks
   ) +
-  geom_sf(
-    aes(fill = day_first_peak, geometry = geometry), 
-    size = 0.05, 
-    color = "grey40", 
-    alpha = 1
+  labs(
+    size = "Mortality rate\nfirst peak",
+    color = "Human\ndevelopment\nindex"
   ) +
-  theme_map() +
-  theme(legend.position = "top") +
-  scale_fill_viridis(
-    option = "mako", 
-    direction = 1,
-    name = "Day of first peak",
-    guide = guide_colorbar(
-      direction = "horizontal",
-      barheight = unit(2, units = "mm"),
-      barwidth = unit(50, units = "mm"),
-      draw.ulim = F,
-      reverse = TRUE,
-      title.position = 'top',
-      title.hjust = 0.5
-    )
+  goldenScatter
+
+save_plot(
+  plot = graph_pca_mort1,
+  filename =  paste0("plots/Presentation/Results/graph_pca_mort1.png"),
+  scale = 2
+)
+
+# Second Peak
+provinces.cov.2 <- provinces %>% 
+  filter(!is.na(log_mort2)) %>% 
+  select(all_of(vars)) 
+
+prov.cov.pca.2 <- prcomp(provinces.cov.2, center = TRUE, scale = TRUE)
+provinces.cov.2 <- provinces %>% 
+  select(all_of(vars), mort_second_peak, HDI_low) %>% 
+  na.omit() %>% 
+  mutate(
+    pc.1  = prov.cov.pca.2$x[,1],
+    pc.2  = prov.cov.pca.2$x[,2]
   )
 
+graph_pca_mort2 <- ggbiplot(prov.cov.pca.2, obs.scale = 1, varname.size = 4, alpha = 0) +
+  geom_point(
+    aes(x = pc.1, y = pc.2, size = mort_second_peak * 1e5),
+    alpha = 0.55,
+    color = "#4363d8",
+    data = provinces.cov.2
+  ) +
+  scale_size(
+    trans = "log",
+    breaks = mort_breaks
+  ) +
+  labs(
+    size = "Mortality rate\nsecond peak",
+    color = "Human\ndevelopment\nindex"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = graph_pca_mort2,
+  filename =  paste0("plots/Presentation/Results/graph_pca_mort2.png"),
+  scale = 2
+)
+
+# RT
+provinces.cov.3 <- provinces %>% 
+  filter(!is.na(rt)) %>% 
+  select(all_of(vars))
+
+prov.cov.pca.3 <- prcomp(provinces.cov.3, center = TRUE, scale. = TRUE)
+provinces.cov.3 <- provinces %>% 
+  select(all_of(vars), HDI_low, rt) %>% 
+  filter(!is.na(rt)) %>% 
+  mutate(
+    pc.1 = prov.cov.pca.3$x[,1],
+    pc.2 = prov.cov.pca.3$x[,2]
+  )
+
+graph_pca_rt <- ggbiplot(prov.cov.pca.3, obs.scale = 1, varname.size = 4, alpha = 0) +
+  geom_point(
+    aes(x = pc.1, y = pc.2, size = rt),
+    alpha = 0.55,
+    color = "#4363d8",
+    data = provinces.cov.3
+  ) +
+  scale_size(
+    trans = "log"
+  ) +
+  labs(
+    size = "Rt",
+    color = "Human\ndevelopment\nindex"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = graph_pca_rt,
+  filename =  paste0("plots/Presentation/Results/graph_pca_rt.png"),
+  scale = 2
+)
+
+# Correlation plots -------------------------------------------------------
+xbreaks <- c(5,10, 30, 100)
+popBreaks <- c(1, 10, 100, 1000) * 1000
+labels <- c("1,000", "10,000", "100,000", "1,000,000")
+
+# Mortality 1 vs Mortality 2
+scatter_mortality <- provinces %>% 
+  ggplot(aes(x = mort_first_peak * 1e5, y = mort_second_peak *1e5)) +
+  geom_point(aes(size = pop), alpha = 0.55, color = "#e6194b") +
+  scale_x_log10(breaks = xbreaks) +
+  scale_y_log10(breaks = xbreaks) +
+  scale_size_area(
+    max_size = 10,
+    breaks = popBreaks, 
+    labels = labels,
+    limits = c(0, 3e6)
+    ) +
+  geom_smooth(method = "lm", color = "black") +
+  labs(
+    x = "Mortality rate first peak",
+    y = "Mortality rate second peak",
+    size = "Population\nsize"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = scatter_mortality ,
+  filename =  paste0("plots/Presentation/Results/scatter_mortality.png"),
+  scale = 1.5
+)
+
+# Migration vs Mortality 1
+scatter_migration1 <- provinces %>% 
+  ggplot(
+    aes(x = mig_in_perc * 1e4, y = mort_first_peak *1e5, color = HDI_low)
+    ) +
+  geom_point(aes(size = pop), alpha = 0.55) +
+  scale_y_log10(breaks = xbreaks) +
+  scale_size_area(
+    max_size = 10,
+    breaks = popBreaks, 
+    labels = labels,
+    limits = c(0, 3e6)
+  ) +
+  geom_smooth(method = "lm") +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    x = "Incoming internal migration per 10,000 inhabitants",
+    y = "Mortality rate first peak",
+    size = "Population\nsize",
+    color = "Human\ndevelopment\nindex"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = scatter_migration1,
+  filename =  paste0("plots/Presentation/Results/scatter_migration1.png"),
+  scale = 1.5
+)
+
+# Migration vs Mortality 2
+scatter_migration2 <- provinces %>% 
+  ggplot(
+    aes(x = mig_in_perc * 1e4, y = mort_second_peak *1e5, color = HDI_low)
+  ) +
+  geom_point(aes(size = pop), alpha = 0.55) +
+  scale_y_log10(breaks = xbreaks) +
+  scale_size_area(
+    max_size = 10,
+    breaks = popBreaks, 
+    labels = labels,
+    limits = c(0, 3e6)
+  ) +
+  geom_smooth(method = "lm") +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    x = "Incoming internal migration per 10,000 inhabitants",
+    y = "Mortality rate second peak",
+    size = "Population\nsize",
+    color = "Human\ndevelopment\nindex"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = scatter_migration2,
+  filename =  paste0("plots/Presentation/Results/scatter_migration2.png"),
+  scale = 1.5
+)
+
+# Migration vs Mortality cum
+scatter_migration_cum <- provinces %>% 
+  ggplot(
+    aes(x = mig_in_perc * 1e4, y = mort_cum *1e5, color = HDI_low)
+  ) +
+  geom_point(aes(size = pop), alpha = 0.55) +
+  scale_y_log10(breaks = xbreaks) +
+  scale_size_area(
+    max_size = 10,
+    breaks = popBreaks, 
+    labels = labels,
+    limits = c(0, 3e6)
+  ) +
+  geom_smooth(method = "lm") +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    x = "Incoming internal migration per 10,000 inhabitants",
+    y = "Cumulative mortality rate",
+    size = "Population\nsize",
+    color = "Human\ndevelopment\nindex"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = scatter_migration_cum ,
+  filename =  paste0("plots/Presentation/Results/scatter_migration_cum.png"),
+  scale = 1.5
+)
+
+# 65 vs Mortality 1
+scatter_65years_mort1 <- provinces %>% 
+  ggplot(
+    aes(x = perc_65_plus, y = mort_first_peak *1e5)
+  ) +
+  geom_point(aes(size = pop), alpha = 0.55, color = "#e6194b") +
+  scale_y_log10(breaks = xbreaks) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_size_area(
+    max_size = 10,
+    breaks = popBreaks, 
+    labels = labels,
+    limits = c(0, 3e6)
+  ) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    x = "Population 65 year or older (%)",
+    y = "Mortality rate first peak",
+    size = "Population\nsize"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = scatter_65years_mort1,
+  filename =  paste0("plots/Presentation/Results/scatter_65years_mort1.png"),
+  scale = 1.5
+)
+
+# 65 vs Mortality 2
+scatter_65years_mort2 <- provinces %>% 
+  ggplot(
+    aes(x = perc_65_plus, y = mort_second_peak *1e5)
+  ) +
+  geom_point(aes(size = pop), alpha = 0.55, color = "#e6194b") +
+  scale_y_log10(breaks = xbreaks) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_size_area(
+    max_size = 10,
+    breaks = popBreaks, 
+    labels = labels,
+    limits = c(0, 3e6)
+  ) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    x = "Population 65 year or older (%)",
+    y = "Mortality rate second peak",
+    size = "Population\nsize"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = scatter_65years_mort2,
+  filename =  paste0("plots/Presentation/Results/scatter_65years_mort2.png"),
+  scale = 1.5
+)
+
+# HDI vs Mortality 1
+scatter_hdi_mort1 <- provinces %>% 
+  ggplot(
+    aes(x = HDI, y = mort_first_peak *1e5)
+  ) +
+  geom_point(aes(size = pop), alpha = 0.55, color = "#e6194b") +
+  scale_y_log10(breaks = xbreaks) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_size_area(
+    max_size = 10,
+    breaks = popBreaks, 
+    labels = labels,
+    limits = c(0, 3e6)
+  ) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    x = "Human development index",
+    y = "Mortality rate first peak",
+    size = "Population\nsize"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = scatter_hdi_mort1 ,
+  filename =  paste0("plots/Presentation/Results/scatter_hdi_mort1.png"),
+  scale = 1.5
+)
+
+# HDI vs Mortality 2
+scatter_hdi_mort2 <- provinces %>% 
+  ggplot(
+    aes(x = HDI, y = mort_second_peak *1e5)
+  ) +
+  geom_point(aes(size = pop), alpha = 0.55, color = "#e6194b") +
+  scale_y_log10(breaks = xbreaks) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_size_area(
+    max_size = 10,
+    breaks = popBreaks, 
+    labels = labels,
+    limits = c(0, 3e6)
+  ) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    x = "Human development index",
+    y = "Mortality rate second peak",
+    size = "Population\nsize"
+  ) +
+  goldenScatter
+
+save_plot(
+  plot = scatter_hdi_mort2 ,
+  filename =  paste0("plots/Presentation/Results/scatter_hdi_mort2.png"),
+  scale = 1.5
+)
