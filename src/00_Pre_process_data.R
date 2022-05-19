@@ -216,12 +216,6 @@ read_excel("data/ceplan_data.xlsx", skip = 8) %>%
   write.csv("data/pre_processed/ceplan.csv", row.names = FALSE)
 
 
-
-
-
-
-
-
 # Susalud -----------------------------------------------------------------
 read.csv("data/ConsultaA_Recursos_Salud_2020_v7.csv") %>% 
   filter(ANHO == 2020, MES == 2) %>% 
@@ -242,3 +236,12 @@ read.csv("data/ConsultaA_Recursos_Salud_2020_v7.csv") %>%
   write.csv("data/pre_processed/susalud.csv", row.names = FALSE)
 
 
+
+# WHO estimates
+read_excel(
+  "data/WHO_COVID_Excess_Deaths_EstimatesByCountry.xlsx", 
+  sheet = 4,
+  skip = 7
+  ) %>% 
+  filter(year == "2020-2021") %>% 
+  write.csv("data/pre_processed/who_excess_mortality.csv", row.names = FALSE)

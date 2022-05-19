@@ -133,6 +133,31 @@ goldenScatter <- theme(
   panel.spacing.y = unit(1, "lines")
 )
 
+goldenScatterbp <- theme(
+  plot.title = element_text(hjust = 0.5),
+  panel.background = element_rect(fill = "white"),
+  aspect.ratio = ((1 + sqrt(5))/2)^(-1),
+  axis.ticks.length = unit(0.5, "char"),
+  axis.line.x.top = element_line(size = 0.2),
+  axis.line.x.bottom = element_line(size = 0.2), 
+  axis.ticks.x = element_line(size = 0.2), 
+  axis.text.x = element_blank(),
+  axis.title.x = element_blank(), 
+  axis.ticks.y = element_blank(),
+  axis.text.y = element_text(color = "black", size = 12, margin = margin(t = 0, r = -4, b = 0, l = 0)),
+  axis.title.y = element_text(size = 18,margin = margin(t = 0, r = 7.5, b = 0)),
+  legend.key = element_rect(fill = NA, color = NA),
+  panel.grid.major.x = element_blank(),
+  panel.grid.major.y = element_line(color = "gray45", size = 0.2),
+  strip.background = element_blank(),
+  strip.text.x = element_text(size=12), 
+  strip.text.y = element_blank(), 
+  strip.placement = "outside", 
+  panel.spacing.x = unit(1.25, "lines"), 
+  panel.spacing.y = unit(1, "lines"),
+  plot.caption = element_text(size = 12)
+)
+
 
 theme_map <- function(...) {
   theme_minimal() +

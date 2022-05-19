@@ -3,6 +3,46 @@ library(stringr)
 library(ggpubr)
 library(viridis)
 library(scales)
+library(ggrepel)
+
+
+# Excess mortality --------------------------------------------------------
+
+who <- read.csv("data/pre_processed/who_excess_mortality.csv")
+
+graph_excess <- who %>% 
+  ggplot(aes(y = excess.mean, x = 0)) +
+  geom_boxplot(
+    width = 0.7,
+    fill = "#7fcdbb",
+    outlier.size = 2, 
+    outlier.alpha = 0.5
+    ) +
+  xlim(-1,1) +
+  geom_label_repel(
+    aes(x = 0, y = excess.mean, label = Country),
+    size = 10,
+    data = who %>% filter(excess.mean > 415),
+    nudge_y = -50,
+    nudge_x = 0.7,
+    arrow = arrow(length = unit(0.015, "npc"))
+  ) +
+  labs(
+    y = "Excess COVID-19 associated deaths / 100,000 pop.",
+    x = NULL,
+    caption = "Source: WHO excess mortality estimates (2022)"
+  ) +
+  goldenScatterbp +
+  theme(aspect.ratio = 10/6)
+
+ggsave(
+  plot = graph_excess,
+  filename =  paste0("plots/Presentation/Introduction/graph_excess.png"),
+  scale = 1,
+  height = 10,
+  width = 5
+)
+
 
 # MR-BRT Plot -------------------------------------------------------------
 
