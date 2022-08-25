@@ -319,4 +319,4 @@ prov_time_series <- predict_spline_cascade(
   newdata = df_pred
   ) %>%
   mutate(mortality = exp(pred)) %>% 
-  write.csv("data/pred_prov_time_series.csv")
+  write.csv("data/pre_processed/pred_prov_time_series.csv")
