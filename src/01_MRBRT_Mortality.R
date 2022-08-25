@@ -1,6 +1,7 @@
 # Load Packages -----------------------------------------------------------
 
 library(dplyr)
+library(readr)
 library(lubridate)
 library(ggplot2)
 library(reticulate)
@@ -91,7 +92,7 @@ mod_prov <- MRBRT(
       alt_cov = "x1",
       use_spline = TRUE,
       spline_knots = array(c(seq(0, 1, by = 0.1))),
-      spline_degree = 3L,
+      spline_degree = 2L,
       spline_knots_type = 'frequency',
       prior_spline_maxder_gaussian = array(c(0, 0.03))
       )
@@ -187,8 +188,8 @@ pred_cascade_prov <- predict_spline_cascade(
   newdata = df_pred
   ) 
 
-# depts <- unique(data_prov$dpt_cdc)
-depts <- "ANCASH"
+depts <- unique(data_prov$dpt_cdc)
+# depts <- "ANCASH"
 
 for (i in depts) {
   
@@ -302,16 +303,16 @@ for (i in depts) {
   print(graph_log)
   print(graph)
   
-  # ggsave(
-  #   plot = graph_log, 
-  #   filename =  paste0("plots/final/log-",i, ".png"), 
-  #   scale = 2
-  #   )
-  # ggsave(
-  #   plot = graph,
-  #   filename =  paste0("plots/final/exp-",i, ".png"),
-  #   scale = 2
-    # )
+  ggsave(
+    plot = graph_log,
+    filename =  paste0("plots/final/log-",i, ".png"),
+    scale = 2
+    )
+  ggsave(
+    plot = graph,
+    filename =  paste0("plots/final/exp-",i, ".png"),
+    scale = 2
+  )
 }
 
 prov_time_series <- predict_spline_cascade(
