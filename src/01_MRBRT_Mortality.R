@@ -66,7 +66,7 @@ data_prov <- data_prov %>%
   bind_rows(province_baseline) %>%
   arrange(dpt_cdc, prov_cdc, pob, x1) %>%
   mutate(
-    id = row_number(),
+    id = 1,
     x1 = x1 + 3
   )
 
