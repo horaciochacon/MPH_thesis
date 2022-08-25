@@ -1,5 +1,6 @@
 library(dplyr)
 library(readxl)
+library(readr)
 library(stringi)
 library(stringr)
 library(sf)
@@ -7,6 +8,35 @@ library(janitor)
 library(lubridate)
 library(tidyr)
 
+
+# Death count -------------------------------------------------------------
+read_delim(
+  "data/fallecidos_covid.csv",
+  delim = ";",
+  locale = locale(encoding = "UTF-8")
+  ) %>% 
+  clean_names() %>% 
+  mutate(
+    fecha_fallecimiento = ymd(fecha_fallecimiento),
+    departamento = str_replace_all(departamento, "Ã\u0091", "Ñ"),
+    provincia = str_replace_all(provincia, "Ã\u0091", "Ñ")
+    ) %>% 
+  group_by(
+    fecha_fallecimiento, sexo, dpt_cdc = departamento, prov_cdc = provincia
+    ) %>% 
+  count() %>% 
+  filter(
+    between(fecha_fallecimiento, as_date("2020-03-02"), as_date("2021-09-30"))
+    ) %>% 
+  write.csv("data/pre_processed/death_count_prov_day.csv", row.names = FALSE)
+
+
+# Province population -----------------------------------------------------
+
+read_csv("data/poblacion_provincial_peru.csv") %>% 
+  group_by(dpt_cdc = DEPARTAMENTO,prov_cdc = PROVINCIA) %>% 
+  summarise(pob = sum(POBLACION)) %>% 
+  write.csv("data/pre_processed/poblacion_prov.csv", row.names = FALSE)
 
 # Population provinces ----------------------------------------------------
 read.csv("data/poblacion_provincial_peru.csv") %>% 
