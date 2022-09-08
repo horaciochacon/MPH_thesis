@@ -116,7 +116,7 @@ read_excel("data/IDH%202019.xlsx", sheet = 3, skip = 2, n_max = 200) %>%
   write.csv("data/pre_processed/HDI.csv", row.names = FALSE)
   
 # Predicted daily mortality time series  ----------------------------------
-read.csv("data/pred_prov_time_series.csv") %>% 
+read.csv("data/pre_processed/pred_prov_time_series.csv") %>% 
   mutate(day = round(x1 * 7, digits = 1), .after = x1) %>% 
   filter(day %in% 0:560) %>% 
   distinct(day, prov_cdc, .keep_all = TRUE) %>% 

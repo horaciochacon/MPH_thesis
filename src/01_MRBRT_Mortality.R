@@ -5,10 +5,10 @@ library(readr)
 library(lubridate)
 library(ggplot2)
 library(reticulate)
-use_condaenv("mrtool-0.0.1")
 library(mrtoolr)
 library(ggpubr)
 library(cowplot)
+use_condaenv("mrtool-0.0.1")
 
 # Loading and Formatting the data -----------------------------------------
 
@@ -44,6 +44,7 @@ data_prov <- death_count_day %>%
   na.omit() %>% 
   select(-dpt_cdc.y, dpt_cdc = dpt_cdc.x, -fecha_fallecimiento)
 
+
 # Baseline Province level data y1 = 0
 province_baseline <- purrr:::map(
   .x = list(-3,-2,-1),
@@ -71,6 +72,8 @@ data_prov <- data_prov %>%
     x1 = x1 + 3
   )
 
+write_csv(data_prov, "data/pre_processed/data_prov.csv")
+
 # MR-BRT Model ---------------------------------------------------------------
 
 # Load data in MRData object
@@ -92,7 +95,7 @@ mod_prov <- MRBRT(
       alt_cov = "x1",
       use_spline = TRUE,
       spline_knots = array(c(seq(0, 1, by = 0.1))),
-      spline_degree = 2L,
+      spline_degree = 3L,
       spline_knots_type = 'frequency',
       prior_spline_maxder_gaussian = array(c(0, 0.03))
       )
@@ -189,7 +192,7 @@ pred_cascade_prov <- predict_spline_cascade(
   ) 
 
 depts <- unique(data_prov$dpt_cdc)
-# depts <- "ANCASH"
+# depts <- "LORETO"
 
 for (i in depts) {
   
@@ -315,9 +318,13 @@ for (i in depts) {
   )
 }
 
-prov_time_series <- predict_spline_cascade(
+predict_spline_cascade(
   fit = mod_spline_prov,
   newdata = df_pred
   ) %>%
   mutate(mortality = exp(pred)) %>% 
-  write.csv("data/pre_processed/pred_prov_time_series.csv")
+  write_csv("data/pre_processed/pred_prov_time_series.csv")
+
+# After saving this, go back to 00_pre_process and execute 
+# "Predicted daily mortality time series" chunk before going to 
+# 02_extrac_features
