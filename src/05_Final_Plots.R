@@ -4,6 +4,11 @@ library(ggpubr)
 library(viridis)
 library(scales)
 library(ggrepel)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(ggbiplot)
 
 
 # Excess mortality --------------------------------------------------------

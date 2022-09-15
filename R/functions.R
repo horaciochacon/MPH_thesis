@@ -190,3 +190,4 @@ add_ui <- function(dat, x_var, lo_var, hi_var, color = "darkblue", opacity = 0.2
     col = adjustcolor(col = color, alpha.f = opacity), border = FALSE
   )
 }
+

@@ -4,6 +4,7 @@ library(purrr)
 library(ggrepel)
 library(EpiEstim)
 library(incidence)
+library(tidyr)
 library(lubridate)
 
 # Reading the necessary data -----------------------------------------------
@@ -20,14 +21,7 @@ mobility <- read.csv("data/pre_processed/mobility.csv") %>%
   mutate(date = as.Date(date))
 
 # Read predicted mortality time series 
-prov_preds <- read.csv("data/pred_prov_time_series.csv") %>% 
-  mutate(day = round(x1 * 7, digits = 1), .after = x1) %>% 
-  filter(day %in% 0:560) %>% 
-  distinct(day, prov_cdc, .keep_all = TRUE) %>% 
-  tibble() %>% 
-  select(day, prov_cdc, dpt_cdc, pred, mortality) %>% 
-  mutate(date = as_date(day + 18323), .before = day) %>% 
-  filter(between(date, as.Date("2020-03-02"), as.Date("2021-06-30"))) %>%
+prov_preds <- read_csv("data/pre_processed/prov_pred_daily_mort.csv") %>%
   left_join(peru_ifr) %>% 
   left_join(poblacion_prov) %>% 
   mutate(
