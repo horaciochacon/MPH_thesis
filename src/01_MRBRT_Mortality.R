@@ -68,9 +68,10 @@ data_prov <- data_prov %>%
   bind_rows(province_baseline) %>%
   arrange(dpt_cdc, prov_cdc, pob, x1) %>%
   mutate(
-    id = 1,
     x1 = x1 + 3
-  )
+  ) %>% 
+  group_by(prov_cdc) %>% 
+  mutate(id = cur_group_id())
 
 write_csv(data_prov, "data/pre_processed/data_prov.csv")
 
@@ -94,10 +95,10 @@ mod_prov <- MRBRT(
     LinearCovModel(
       alt_cov = "x1",
       use_spline = TRUE,
-      spline_knots = array(c(seq(0, 1, by = 0.1))),
+      spline_knots = array(c(seq(0, 1, by = 0.0625))),
       spline_degree = 3L,
       spline_knots_type = 'frequency',
-      prior_spline_maxder_gaussian = array(c(0, 0.03))
+      prior_spline_maxder_gaussian = array(c(0, 0.05))
       )
     )
   )
@@ -171,7 +172,7 @@ mod_spline_prov <- run_spline_cascade(
   col_obs_se = "sd",
   col_study_id = "id",
   stage_id_vars = c("dpt_cdc", "prov_cdc"),
-  thetas = c(10, 10),
+  thetas = c(10, 15),
   output_dir = "output/",
   model_label = "mbrt_cascade_peru_prov",
   overwrite_previous = TRUE
@@ -192,7 +193,7 @@ pred_cascade_prov <- predict_spline_cascade(
   ) 
 
 depts <- unique(data_prov$dpt_cdc)
-# depts <- "LORETO"
+depts <- "ANCASH"
 
 for (i in depts) {
   
