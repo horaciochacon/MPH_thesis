@@ -5,3 +5,5 @@
 pred_prov_time_series.csv
 data/pred_prov_time_series.csv
 .DS_Store
+output/mbrt_cascade_dpto_peru/*
+output/mbrt_cascade_peru_prov/*
