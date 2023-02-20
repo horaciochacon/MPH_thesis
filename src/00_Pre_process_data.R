@@ -4,7 +4,7 @@ library(readr)
 library(stringi)
 library(stringr)
 library(sf)
-library(janitor)
+library(janitor,lib.loc = "~/rlibs/")
 library(lubridate)
 library(tidyr)
 

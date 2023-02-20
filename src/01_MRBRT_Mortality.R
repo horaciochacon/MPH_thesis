@@ -1,47 +1,56 @@
 # Load Packages -----------------------------------------------------------
 
-library(dplyr)
+library(readr)
 library(lubridate)
 library(ggplot2)
 library(reticulate)
-use_condaenv("mrtool-0.0.1")
-library(mrtoolr)
 library(ggpubr)
 library(cowplot)
+library(data.table)
+library(tidyr)
+library(dplyr)
+reticulate::use_python("/ihme/code/mscm/miniconda3/envs/mrtool_0.0.2/bin/python")
+cw <- reticulate::import("crosswalk")
+mr <- reticulate::import("mrtool")
+
+library(reticulate, lib.loc = "/ihme/singularity-images/rstudio/lib/4.2.1/")
+library(dplyr, lib.loc = "/ihme/singularity-images/rstudio/lib/4.2.1/")
+Sys.setenv("RETICULATE_PYTHON" = "/ihme/code/mscm/miniconda3/envs/mrtool_0.0.1/bin/python")
+library(mrbrt003, lib.loc = "/ihme/code/mscm/Rv4/dev_packages/")
+
+
+# Setting model run parameters ------------------------------------------------------------------------------------
+
+theta_dpt   <- 10
+theta_prov  <- 25
 
 # Loading and Formatting the data -----------------------------------------
 
 # Death count per day dataset
-death_count_day <- read_csv("data/pre_processed/death_count_prov_day.csv")
+death_count_day <- fread("data/pre_processed/death_count_prov_day.csv")
 
 # Province level population
-poblacion_prov <- read_csv("data/pre_processed/poblacion_prov.csv")
+poblacion_prov <- fread("data/pre_processed/poblacion_prov.csv")
 
 # Offset of 0.00001
 # Province level death counts
-data_prov <- death_count_day %>% 
-  mutate(
-    fecha_fallecimiento = floor_date(
-      fecha_fallecimiento, "weeks", week_start = 1
-    )
-  ) %>% 
-  group_by(fecha_fallecimiento, dpt_cdc, prov_cdc) %>%
-  summarise(n = sum(n)) %>% 
-  left_join(poblacion_prov, by = "prov_cdc") %>% 
-  ungroup() %>% 
-  mutate(
-    y1 = n / pob,
-    ylog = log(y1 + min(y1, na.rm = TRUE)/2),
-    x1 = (as.numeric(fecha_fallecimiento) - 18323) / 7,
-    sd = sqrt(
-      (1 - (y1 + min(y1, na.rm = TRUE)/2)) / 
-        ((y1 + min(y1, na.rm = TRUE)/2) * pob)
-    ),
-    y_low = ylog - (1.96 * sd),
-    y_upp = ylog + (1.96 * sd)
-  ) %>% 
-  na.omit() %>% 
-  select(-dpt_cdc.y, dpt_cdc = dpt_cdc.x, -fecha_fallecimiento)
+data_prov <- (
+  death_count_day
+  [, fecha_fallecimiento := floor_date(fecha_fallecimiento, "weeks", week_start = 1) ]
+  [, .(n = sum(n)), by = .(fecha_fallecimiento, dpt_cdc, prov_cdc) ]
+  [ poblacion_prov[, 2:5], on = .(prov_cdc) ]
+  [, y1 := n / pob ]
+  [, x1 := (as.numeric(fecha_fallecimiento) - 18323) / 7 ]
+  [, sd := sqrt((y1* (1 - y1)) / pob) ]
+)
+
+data_prov <- (
+  data_prov
+  [, ylog := cw$utils$linear_to_log(mean = array(data_prov$y1), sd = array(data_prov$sd))[[1]]]
+  [, sdlog := cw$utils$linear_to_log(mean = array(data_prov$y1), sd = array(data_prov$sd))[[2]]]
+  [, `:=`(y_low = ylog - (1.96 * sd), y_upp = ylog + (1.96 * sd)) ]
+  [, !"fecha_fallecimiento"]
+  ) 
 
 # Baseline Province level data y1 = 0
 province_baseline <- purrr:::map(
@@ -55,6 +64,8 @@ province_baseline <- purrr:::map(
       ylog = log(0 + min(data_prov$y1)/2),
       n = 0,
       sd = 1,
+      ylog = cw$utils$linear_to_log(mean = array(0 + min(data_prov$y1)/2), sd = array(0))[[1]],
+      sdlog = 0.02,
       y_low = ylog - (1.96 * sd),
       y_upp = ylog + (1.96 * sd)
       )
@@ -68,30 +79,58 @@ data_prov <- data_prov %>%
   mutate(
     id = row_number(),
     x1 = x1 + 3
-  )
+  ) %>% 
+  fill(id_dpt, .direction = "up")
 
 # MR-BRT Model ---------------------------------------------------------------
 
 # Load data in MRData object
-prov_mrbrt <- MRData()
+prov_mrbrt <- mr$MRData()
 prov_mrbrt$load_df(
-  data = data_prov,  
-  col_obs = "ylog", 
-  col_obs_se = "sd",
-  col_covs = list("x1"), 
-  col_study_id = "id" 
+  data = data_prov,
+  col_obs = "ylog",
+  col_obs_se = "sdlog",
+  col_covs = list("x1"),
+  col_study_id = "id"
   )
+# 
+# knots_samples <- utils$sample_knots(
+#   num_intervals = 16L, 
+#   num_samples = 20L
+# )
+# 
+# ensemble_cov_model1 <- LinearCovModel(
+#   alt_cov = "x1",
+#   use_spline = TRUE,
+#   spline_knots = array(c(seq(0, 1, by = 0.0625))),
+#   spline_degree = 2L,
+#   spline_knots_type = 'frequency'
+# )
+# 
+# mod_prov <- MRBeRT(
+#   data = prov_mrbrt,
+#   ensemble_cov_model = ensemble_cov_model1,
+#   ensemble_knots = knots_samples,
+#   cov_models = list(
+#     LinearCovModel("intercept", use_re = FALSE)
+#   )
+# )
+# 
+# mod_prov$fit_model(inner_print_level = 5L, inner_max_iter = 1000L)
+#   
+# best_knots1 <- mod_prov$ensemble_knots[which.max(mod_prov$weights), ]
+best_knots1 <- seq(0,1, by = 0.0625)
 
 # Create MRBRT model and configure covariates
-mod_prov <- MRBRT(
+mod_prov <- mr$MRBRT(
   data = prov_mrbrt,
   cov_models = list(
-    LinearCovModel("intercept", use_re = TRUE),
-    LinearCovModel(
+    mr$LinearCovModel("intercept", use_re = FALSE),
+    mr$LinearCovModel(
       alt_cov = "x1",
       use_spline = TRUE,
-      spline_knots = array(c(seq(0, 1, by = 0.1))),
-      spline_degree = 3L,
+      spline_knots = array(best_knots1),
+      spline_degree = 2L,
       spline_knots_type = 'frequency',
       prior_spline_maxder_gaussian = array(c(0, 0.03))
       )
@@ -101,12 +140,12 @@ mod_prov <- MRBRT(
 # Fit MRBRT model
 mod_prov$fit_model(
   inner_print_level = 5L, 
-  inner_max_iter = 10000L
+  inner_max_iter = 1000L
   )
 
 # Create predicted MRData object
-df_pred <- data.frame(x1 = seq(0, 85, by = 0.01))
-dat_pred_prov <- MRData()
+df_pred <- data.frame(x1 = seq(0, 80, by = 0.01))
+dat_pred_prov <- mr$MRData()
 dat_pred_prov$load_df(
   data = df_pred, 
   col_covs = list('x1')
@@ -128,12 +167,13 @@ ggplot(data_prov) +
 # Create and fit MRBRT department-level cascade spline model
 mod_spline_dpto <- run_spline_cascade(
   stage1_model_object = mod_prov,
+  gaussian_prior = TRUE,
   df = data_prov,
   col_obs = "ylog",
-  col_obs_se = "sd",
+  col_obs_se = "sdlog",
   col_study_id = "id",
   stage_id_vars = "dpt_cdc",
-  thetas = 10,
+  thetas = theta_dpt,
   output_dir = "output/",
   model_label = "mbrt_cascade_dpto_peru",
   overwrite_previous = TRUE
@@ -157,17 +197,19 @@ ggplot() +
   labs(x = "Week", y = "Mortality per 100,000") +
   theme_bw()
 
+
 # Cascade splines Prov --------------------------------------------------------
 
 # Create and fit MRBRT province-level cascade spline model
 mod_spline_prov <- run_spline_cascade(
   stage1_model_object = mod_prov,
   df = data_prov,
+  gaussian_prior = TRUE,
   col_obs = "ylog",
-  col_obs_se = "sd",
+  col_obs_se = "sdlog",
   col_study_id = "id",
   stage_id_vars = c("dpt_cdc", "prov_cdc"),
-  thetas = c(10, 10),
+  thetas = c(theta_dpt, theta_prov),
   output_dir = "output/",
   model_label = "mbrt_cascade_peru_prov",
   overwrite_previous = TRUE
@@ -187,8 +229,8 @@ pred_cascade_prov <- predict_spline_cascade(
   newdata = df_pred
   ) 
 
-# depts <- unique(data_prov$dpt_cdc)
-depts <- "ANCASH"
+depts <- unique(data_prov$dpt_cdc)
+# depts <- "ANCASH"
 
 for (i in depts) {
   
@@ -302,16 +344,27 @@ for (i in depts) {
   print(graph_log)
   print(graph)
   
-  # ggsave(
-  #   plot = graph_log, 
-  #   filename =  paste0("plots/final/log-",i, ".png"), 
-  #   scale = 2
-  #   )
-  # ggsave(
-  #   plot = graph,
-  #   filename =  paste0("plots/final/exp-",i, ".png"),
-  #   scale = 2
-    # )
+  ggsave(
+    plot = graph_log,
+    filename =  paste0(
+      "plots/final/log-theta_dept",
+      theta_dpt,
+      "_theta_prov",
+      thetha_prov,
+      "_",
+      i, ".png"),
+    scale = 2
+    )
+  ggsave(
+    plot = graph,
+    filename =  paste0("plots/final/exp-theta_dept",
+                       theta_dpt,
+                       "_theta_prov",
+                       thetha_prov,
+                       "_",
+                       i, ".png"),
+    scale = 2
+  )
 }
 
 prov_time_series <- predict_spline_cascade(
