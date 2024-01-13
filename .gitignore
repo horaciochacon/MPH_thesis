@@ -5,5 +5,7 @@
 pred_prov_time_series.csv
 data/pred_prov_time_series.csv
 .DS_Store
-output/mbrt_cascade_dpto_peru/*
-output/mbrt_cascade_peru_prov/*
+*.pkl
+.DS_Store
+output/model_error.csv
+output/prediction_thetas.csv
