@@ -21,8 +21,8 @@ library(mrbrt003, lib.loc = "/ihme/code/mscm/Rv4/dev_packages/")
 
 # Setting model run parameters ------------------------------------------------------------------------------------
 
-theta_dpt   <- 10
-theta_prov  <- 25
+theta_dpt   <- 12
+theta_prov  <- 15
 
 # Loading and Formatting the data -----------------------------------------
 
@@ -175,7 +175,7 @@ mod_spline_dpto <- run_spline_cascade(
   stage_id_vars = "dpt_cdc",
   thetas = theta_dpt,
   output_dir = "output/",
-  model_label = "mbrt_cascade_dpto_peru",
+  model_label = "mrbrt_cascade_dpto_peru",
   overwrite_previous = TRUE
   )
 
@@ -211,7 +211,7 @@ mod_spline_prov <- run_spline_cascade(
   stage_id_vars = c("dpt_cdc", "prov_cdc"),
   thetas = c(theta_dpt, theta_prov),
   output_dir = "output/",
-  model_label = "mbrt_cascade_peru_prov",
+  model_label = "mrbrt_cascade_peru_prov",
   overwrite_previous = TRUE
   )
 
@@ -350,7 +350,7 @@ for (i in depts) {
       "plots/final/log-theta_dept",
       theta_dpt,
       "_theta_prov",
-      thetha_prov,
+      theta_prov,
       "_",
       i, ".png"),
     scale = 2
@@ -360,16 +360,16 @@ for (i in depts) {
     filename =  paste0("plots/final/exp-theta_dept",
                        theta_dpt,
                        "_theta_prov",
-                       thetha_prov,
+                       theta_prov,
                        "_",
                        i, ".png"),
     scale = 2
   )
 }
 
-prov_time_series <- predict_spline_cascade(
-  fit = mod_spline_prov,
-  newdata = df_pred
-  ) %>%
-  mutate(mortality = exp(pred)) %>% 
-  write.csv("data/pre_processed/pred_prov_time_series.csv")
+# prov_time_series <- predict_spline_cascade(
+#   fit = mod_spline_prov,
+#   newdata = df_pred
+#   ) %>%
+#   mutate(mortality = exp(pred)) %>% 
+#   write.csv("data/pre_processed/pred_prov_time_series.csv")
