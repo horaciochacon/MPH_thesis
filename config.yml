@@ -1,0 +1,23 @@
+default:
+  mrbrt:
+    spline_degree: 3
+    spline_knots_type: "frequency"
+    prior_spline_maxder_gaussian: !expr array(c(0, 0.03))
+    spline_knots: !expr array(c(seq(0, 1, by = 0.1)))
+  cascade:
+    output: "output/"
+    dpt_label: "mrbrt_cascade_dpt"
+    prov_label: "mrbrt_cascade_prov"
+    theta_dpt: 12
+    theta_prov: 15
+  pred:
+    res: 0.1
+    depts: !expr unique(utils::read.csv("data/pre_processed/poblacion_prov.csv")[,1])
+  save:
+    plots: FALSE
+    plot_dir: "plots/test/"
+    plots_format: ".png"
+    prediction: FALSE
+    prediction_dir: "data/pre_processed/pred_prov_time_series.csv"
+    
+    
