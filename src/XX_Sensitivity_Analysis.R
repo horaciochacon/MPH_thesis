@@ -37,6 +37,7 @@ waves <- copy(data_prov)
 waves <- waves[, k := ifelse(x1 < 43, 1, 2)]
 waves <- waves[, .(y_obs = sum(n, na.rm = TRUE)), by = .(dpt_cdc, prov_cdc, k)]
 waves <- waves[pob, on = .(prov_cdc, dpt_cdc), nomatch = NA]
+waves <- waves[!prov_cdc == "LIMA"]
 waves <- waves[, w_k := ifelse(
   k == 1, y_obs / sum(waves$y_obs[waves[,k == 1]]),
   y_obs / sum(waves$y_obs[waves[,k == 2]]))
@@ -48,6 +49,7 @@ data_sens <- copy(data)
 
 data_sens <- (
   data_sens
+  [ !is.na(y_obs)]
   [, k := ifelse(x1 < 43, 1, 2)]
   [waves, on = .(prov_cdc, dpt_cdc, k), nomatch = NA]
   [, e := (exp(y_obs) * 1e6 - exp(y_hat)*1e6)^2]
@@ -63,20 +65,22 @@ df_we_ki  <- data_sens[, .(we_k = sum(we)), by = .(theta_dpt, theta_prov, k, dpt
 df_we_kij <- data_sens[, .(we_k = sum(we)), by = .(theta_dpt, theta_prov, k, dpt_cdc, prov_cdc)]
 
 
-data <- df_we_kij %>% 
-  group_by(prov_cdc, k) %>% 
-  mutate(we_k = ifelse(we_k >= 4e4, NA, we_k)) %>% 
-  summarise(med = median(we_k, na.rm = TRUE))
+# data <- df_we_kij %>% 
+#   group_by(prov_cdc, k) %>% 
+#   mutate(we_k = ifelse(we_k >= 4e4, NA, we_k)) %>% 
+#   summarise(med = median(we_k, na.rm = TRUE))
+# 
+# df_we_kij_avg <-  df_we_kij %>% 
+#   left_join(data) %>% 
+#   mutate(we_k_avg = we_k / med)
 
-df_we_kij_avg <-  df_we_kij %>% 
-  left_join(data) %>% 
-  mutate(we_k_avg = we_k / med)
-
+fwrite(waves, paste0(config$sbatch$wd, "sensitivity/waves.csv")) 
 fwrite(df_we_k, paste0(config$sbatch$wd, "sensitivity/predicted_we/df_we_k.csv")) 
 fwrite(df_we_l, paste0(config$sbatch$wd, "sensitivity/predicted_we/df_we_l.csv"))
 fwrite(df_we_ki, paste0(config$sbatch$wd, "sensitivity/predicted_we/df_we_ki.csv"))
 fwrite(df_we_kij,  paste0(config$sbatch$wd, "sensitivity/predicted_we/df_we_kij.csv"))
 
+config$pred$provs <- config$pred$provs[-which(config$pred$provs == "LIMA")]
 
 # Heatmaps ---------------------------------------------------------------------------------------
 
@@ -218,21 +222,6 @@ gg_we_kij_1 %>%
     height = 10,
     width = 10
   ))
-
-# By Province (Wave 2) Grid
-df_we_kij %>% 
-  filter(we_k < 1.5, k == 2) %>% 
-  ggplot(aes(x = theta_prov, y = theta_dpt, fill = we_k)) +
-  geom_tile() +
-  scale_fill_viridis(
-    option = "inferno",
-    direction = -1, 
-    trans = "log",
-    limits = c(0.0000001, 1.5)
-  ) +
-  facet_wrap(. ~ prov_cdc) +
-  theme_minimal()
-
 
 # By Province (Wave 2)
 gg_we_kij_2 <- config$pred$provs %>% 

@@ -101,8 +101,8 @@ saveRDS(data_prov, "sensitivity/data_prov.rds")
 
 # Cascade splines Prov --------------------------------------------------------
 
-theta_dpt <- 43:50
-theta_prov <- 26:50
+theta_dpt <- 1:50
+theta_prov <- 1:50
 prev_batch_job_ids <- NULL
 
 for (i in theta_dpt) {
@@ -115,7 +115,7 @@ for (i in theta_dpt) {
     jobname <- paste0("mrbrtcovid_pipeline_dpt_", i, "prov", j)
     
     sys.sub <- paste0(
-      "sbatch --parsable -A proj_uscounties ", 
+      "sbatch --parsable -A proj_lsae ", 
       " -J ", jobname,
       " -o ", "/homes/hchacont/logs/%x.o%j",
       " -c ", config$sbatch$threads, 

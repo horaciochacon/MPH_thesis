@@ -55,11 +55,21 @@ pred_cascade_prov <- predict_spline_cascade(
 data_pred <- (
   pred_cascade_prov
   [, y_hat := pred][, pred := NULL]
-  [data_prov[,c(1:3,7:11)], on = .(prov_cdc, dpt_cdc, x1), nomatch = NA]
-  [n != 0]
+)
+
+data_pred <-  merge(data_pred, data_prov[,c(1:3,7:11)], all.x = TRUE)
+
+data_pred <- (
+  data_pred
   [, y_obs := ylog][, ylog := NULL]
   [, theta_dpt := theta_dpt][, theta_prov := theta_prov]
 )
+
+#   [data_prov[,c(1:3,7:11)], on = .(prov_cdc, dpt_cdc, x1)]
+#   # [n != 0]
+#   # [, y_obs := ylog][, ylog := NULL]
+#   # [, theta_dpt := theta_dpt][, theta_prov := theta_prov]
+# )
 
 
 write.csv(
