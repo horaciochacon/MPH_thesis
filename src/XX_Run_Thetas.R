@@ -1,19 +1,23 @@
 # Packages and Dependencies -------------------------------------------------------------------
 library(data.table)
 reticulate::use_python("/ihme/code/mscm/miniconda3/envs/mrtool_0.0.1/bin/python")
-config <- config::get(config = "sensitivity")
 library(mrbrt003, lib.loc = "/ihme/code/mscm/Rv4/dev_packages/")
-
-# Load data and model -------------------------------------------------------------------------
-mod_nat <- py_load_object(paste0(config$sbatch$wd, "sensitivity/mod_nat.pickle"))
-data_prov <- readRDS(paste0(config$sbatch$wd, "sensitivity/data_prov.rds"))
-poblacion_prov <- fread(paste0(config$sbatch$wd, "data/pre_processed/poblacion_prov.csv"))
 
 # Arguments -----------------------------------------------------------------------------------
 if (!interactive()) {
   (theta_dpt <- as.numeric(commandArgs(TRUE)[[1]]))
   (theta_prov <- as.numeric(commandArgs(TRUE)[[2]]))
+  (output_dir <- as.character(commandArgs(TRUE)[[3]]))
+  (config_loc <- as.character(commandArgs(TRUE)[[4]]))
 }
+
+config <- config::get(file = config_loc, config = "sensitivity")
+
+# Load data and model -------------------------------------------------------------------------
+mod_nat <- py_load_object(paste0(output_dir , "/sensitivity/mod_nat.pickle"))
+data_prov <- readRDS(paste0(output_dir , "/sensitivity/data_prov.rds"))
+poblacion_prov <- fread(paste0(config$sbatch$wd, "data/pre_processed/poblacion_prov.csv"))
+
 
 print(paste("Theta Department = ", theta_dpt))
 print(paste("Theta Province = ", theta_prov))
@@ -28,7 +32,7 @@ mod_cascade_prov <- run_spline_cascade(
   col_study_id = "id",
   stage_id_vars = c("dpt_cdc", "prov_cdc"),
   thetas = c(theta_dpt, theta_prov),
-  output_dir = config$sensitivity$output,
+  output_dir = paste0(output_dir,"/sensitivity/models"),
   model_label = paste0("thetaprov_",theta_prov,"_thetadpt_", theta_dpt),
   overwrite_previous = TRUE
 )
@@ -55,7 +59,7 @@ pred_cascade_prov <- predict_spline_cascade(
 data_pred <- (
   pred_cascade_prov
   [, y_hat := pred][, pred := NULL]
-)
+  )
 
 data_pred <-  merge(data_pred, data_prov[,c(1:3,7:11)], all.x = TRUE)
 
@@ -63,20 +67,13 @@ data_pred <- (
   data_pred
   [, y_obs := ylog][, ylog := NULL]
   [, theta_dpt := theta_dpt][, theta_prov := theta_prov]
-)
+  )
 
-#   [data_prov[,c(1:3,7:11)], on = .(prov_cdc, dpt_cdc, x1)]
-#   # [n != 0]
-#   # [, y_obs := ylog][, ylog := NULL]
-#   # [, theta_dpt := theta_dpt][, theta_prov := theta_prov]
-# )
-
-
-write.csv(
+fwrite(
   data_pred,
   paste0(
-    config$sbatch$wd,
-    "sensitivity/output/",
+    output_dir,
+    "/sensitivity/output/",
     "errors_prov_",theta_prov,
     "_dpt_", theta_dpt,
     ".csv" ),

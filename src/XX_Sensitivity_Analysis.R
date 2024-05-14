@@ -14,11 +14,15 @@ library(viridisLite)
 library(stringr)
 config <- config::get(config = "sensitivity")
 
+# Arguments -----------------------------------------------------------------------------------
+if (!interactive()) {
+  (output_dir <- as.character(commandArgs(TRUE)[[1]]))
+}
 
 # Read Sensitivity files ----------------------------------------------------------------------
 
 # Set path to folder
-path <- "sensitivity/output/"
+path <- paste0(output_dir, "/sensitivity/output/")
 
 # List all files in the folder
 file_list <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
@@ -27,8 +31,8 @@ file_list <- list.files(path, pattern = "\\.csv$", full.names = TRUE)
 data <- rbindlist(lapply(file_list, fread))
 
 # Read Auxiliary Files
-data_prov <- readRDS(paste0(config$sbatch$wd, "sensitivity/data_prov.rds"))
-pob <- fread("data/pre_processed/poblacion_prov.csv")[,1:3]
+data_prov <- readRDS(paste0(output_dir, "/sensitivity/data_prov.rds"))
+pob <- fread(paste0(config$sbatch$wd, "data/pre_processed/poblacion_prov.csv"))[,1:3]
 
 # Calculate Error, Weight and Weighted Error --------------------------------------------------
 
@@ -37,7 +41,6 @@ waves <- copy(data_prov)
 waves <- waves[, k := ifelse(x1 < 43, 1, 2)]
 waves <- waves[, .(y_obs = sum(n, na.rm = TRUE)), by = .(dpt_cdc, prov_cdc, k)]
 waves <- waves[pob, on = .(prov_cdc, dpt_cdc), nomatch = NA]
-waves <- waves[!prov_cdc == "LIMA"]
 waves <- waves[, w_k := ifelse(
   k == 1, y_obs / sum(waves$y_obs[waves[,k == 1]]),
   y_obs / sum(waves$y_obs[waves[,k == 2]]))
@@ -56,7 +59,6 @@ data_sens <- (
   [, we := e * w_k]
 )
 
-
 # Saving the Predicted theta-specific Weighted Errors -----------------------------------------
 
 df_we_k   <- data_sens[, .(we_k = sum(we[is.finite(we)])), by = .(theta_dpt, theta_prov, k)]
@@ -64,64 +66,51 @@ df_we_l   <- data_sens[, .(we_k = sum(we)), by = .(theta_dpt, theta_prov,l = x1)
 df_we_ki  <- data_sens[, .(we_k = sum(we)), by = .(theta_dpt, theta_prov, k, dpt_cdc)]
 df_we_kij <- data_sens[, .(we_k = sum(we)), by = .(theta_dpt, theta_prov, k, dpt_cdc, prov_cdc)]
 
-
-# data <- df_we_kij %>% 
-#   group_by(prov_cdc, k) %>% 
-#   mutate(we_k = ifelse(we_k >= 4e4, NA, we_k)) %>% 
-#   summarise(med = median(we_k, na.rm = TRUE))
-# 
-# df_we_kij_avg <-  df_we_kij %>% 
-#   left_join(data) %>% 
-#   mutate(we_k_avg = we_k / med)
-
-fwrite(waves, paste0(config$sbatch$wd, "sensitivity/waves.csv")) 
-fwrite(df_we_k, paste0(config$sbatch$wd, "sensitivity/predicted_we/df_we_k.csv")) 
-fwrite(df_we_l, paste0(config$sbatch$wd, "sensitivity/predicted_we/df_we_l.csv"))
-fwrite(df_we_ki, paste0(config$sbatch$wd, "sensitivity/predicted_we/df_we_ki.csv"))
-fwrite(df_we_kij,  paste0(config$sbatch$wd, "sensitivity/predicted_we/df_we_kij.csv"))
-
-config$pred$provs <- config$pred$provs[-which(config$pred$provs == "LIMA")]
+fwrite(waves, paste0(output_dir, "sensitivity/waves.csv")) 
+fwrite(df_we_k, paste0(output_dir, "sensitivity/predicted_we/df_we_k.csv")) 
+fwrite(df_we_l, paste0(output_dir, "sensitivity/predicted_we/df_we_l.csv"))
+fwrite(df_we_ki, paste0(output_dir, "sensitivity/predicted_we/df_we_ki.csv"))
+fwrite(df_we_kij,  paste0(output_dir, "sensitivity/predicted_we/df_we_kij.csv"))
 
 # Heatmaps ---------------------------------------------------------------------------------------
 
-
 # Wave 1
-df_we_k %>% 
-  filter(k == 1) %>%
-  mutate(
-    we_k = ifelse(
-      we_k > quantile(.$we_k, probs = 0.8),
-      quantile(.$we_k, probs = 0.8),
-      we_k
-    )
-  ) %>% 
-  ggplot(aes(x = theta_prov, y = theta_dpt, fill = we_k)) +
-  geom_tile() +
-  scale_fill_viridis(
-    option = "inferno", 
-    direction = -1,
-    trans = "log"
-    ) +
-  theme_minimal()
+# df_we_k %>% 
+#   filter(k == 1) %>%
+#   mutate(
+#     we_k = ifelse(
+#       we_k > quantile(.$we_k, probs = 0.8),
+#       quantile(.$we_k, probs = 0.8),
+#       we_k
+#     )
+#   ) %>% 
+#   ggplot(aes(x = theta_prov, y = theta_dpt, fill = we_k)) +
+#   geom_tile() +
+#   scale_fill_viridis(
+#     option = "inferno", 
+#     direction = -1,
+#     trans = "log"
+#     ) +
+#   theme_minimal()
 
 # Wave 2
-df_we_k %>% 
-  filter(k == 2) %>%
-  mutate(
-    we_k = ifelse(
-      we_k > quantile(.$we_k, probs = 0.8),
-      quantile(.$we_k, probs = 0.8),
-      we_k
-    )
-  ) %>% 
-  ggplot(aes(x = theta_prov, y = theta_dpt, fill = we_k)) +
-  geom_tile() +
-  scale_fill_viridis(
-    option = "inferno", 
-    direction = -1,
-    trans = "log"
-  ) +
-  theme_minimal()
+# df_we_k %>% 
+#   filter(k == 2) %>%
+#   mutate(
+#     we_k = ifelse(
+#       we_k > quantile(.$we_k, probs = 0.8),
+#       quantile(.$we_k, probs = 0.8),
+#       we_k
+#     )
+#   ) %>% 
+#   ggplot(aes(x = theta_prov, y = theta_dpt, fill = we_k)) +
+#   geom_tile() +
+#   scale_fill_viridis(
+#     option = "inferno", 
+#     direction = -1,
+#     trans = "log"
+#   ) +
+#   theme_minimal()
 
 
 # By Department (Wave 1)
@@ -149,7 +138,7 @@ gg_we_ki_1 <- config$pred$depts %>%
 
 gg_we_ki_1 %>% 
   map(~ggsave(
-    filename = paste0("sensitivity/Plots/we_ki/", .x$labels$title, ".pdf"), 
+    filename = paste0(output_dir, "/sensitivity/Plots/we_ki/", .x$labels$title, ".pdf"), 
     plot = .x,
     scale = 1,
     height = 10,
@@ -181,7 +170,7 @@ gg_we_ki_2 <- config$pred$depts %>%
 
 gg_we_ki_2 %>% 
   map(~ggsave(
-    filename = paste0("sensitivity/Plots/we_ki/", .x$labels$title, ".pdf"), 
+    filename = paste0(output_dir, "/sensitivity/Plots/we_ki/", .x$labels$title, ".pdf"), 
     plot = .x,
     scale = 1,
     height = 10,
@@ -216,7 +205,7 @@ gg_we_kij_1 <- config$pred$provs %>%
 
 gg_we_kij_1 %>% 
   map(~ggsave(
-    filename = paste0("sensitivity/Plots/we_kij/", .x$labels$title, ".pdf"), 
+    filename = paste0(output_dir, "/sensitivity/Plots/we_kij/", .x$labels$title, ".pdf"), 
     plot = .x,
     scale = 1,
     height = 10,
@@ -241,7 +230,6 @@ gg_we_kij_2 <- config$pred$provs %>%
         option = "inferno",
         direction = -1, 
         trans = log_trans()
-        # limits = c(0.0000001, 1.5)
       ) +
       facet_wrap(. ~ prov_cdc) +
       labs(title = paste0(.x, " - Wave 2")) +
@@ -250,7 +238,7 @@ gg_we_kij_2 <- config$pred$provs %>%
 
 gg_we_kij_2 %>% 
   map(~ggsave(
-    filename = paste0("sensitivity/Plots/we_kij/", .x$labels$title, ".pdf"), 
+    filename = paste0(output_dir, "/sensitivity/Plots/we_kij/", .x$labels$title, ".pdf"), 
     plot = .x,
     scale = 1,
     height = 10,
@@ -282,7 +270,7 @@ gg_we_l <- 3:85 %>%
 
 gg_we_l %>% 
   map(~ggsave(
-    filename = paste0("sensitivity/Plots/we_l/", .x$labels$title, ".pdf"), 
+    filename = paste0(output_dir, "/sensitivity/Plots/we_l/", .x$labels$title, ".pdf"), 
     plot = .x,
     scale = 1,
     height = 10,
@@ -292,13 +280,13 @@ gg_we_l %>%
 
 # Additional Exploration ----------------------------------------------------------------------
 
-df_we_l %>% 
-  group_by(l) %>% 
-  summarise(median_we = median(we_k)) %>% 
-  ggplot(aes(x = l, y = median_we)) +
-  geom_line(linewidth = 1) +
-  labs(x = "Week", y = "Weighted Error") +
-  theme_bw()
+# df_we_l %>% 
+#   group_by(l) %>% 
+#   summarise(median_we = median(we_k)) %>% 
+#   ggplot(aes(x = l, y = median_we)) +
+#   geom_line(linewidth = 1) +
+#   labs(x = "Week", y = "Weighted Error") +
+#   theme_bw()
 
 
 # 5 -10% Cluster identification (Province) --------------------------------------------------------
@@ -318,15 +306,15 @@ prov_min_5_agg_1 <- prov_min_5_df_1 %>%
   summarise(sum = n())
 
 # Plot count heat map of count of lowest 5% we by theta combination (Wave 1)
-prov_min_5_agg_1 %>% 
-  ggplot(aes(x = theta_prov, y = theta_dpt, fill = sum)) +
-  geom_tile() +
-  scale_fill_viridis(
-    option = "inferno",
-    direction = -1, 
-    trans = log_trans()
-  ) +
-  theme_bw()
+# prov_min_5_agg_1 %>% 
+#   ggplot(aes(x = theta_prov, y = theta_dpt, fill = sum)) +
+#   geom_tile() +
+#   scale_fill_viridis(
+#     option = "inferno",
+#     direction = -1, 
+#     trans = log_trans()
+#   ) +
+#   theme_bw()
 
 # Per Province per Wave 2
 prov_min_5_df_2 <- df_we_kij %>% 
@@ -343,15 +331,15 @@ prov_min_5_agg_2 <- prov_min_5_df_2 %>%
   summarise(sum = n())
 
 # Plot count heat map of count of lowest 5% we by theta combination (Wave 1)
-prov_min_5_agg_2 %>% 
-  ggplot(aes(x = theta_prov, y = theta_dpt, fill = sum)) +
-  geom_tile() +
-  scale_fill_viridis(
-    option = "inferno",
-    direction = -1, 
-    trans = log_trans()
-  ) +
-  theme_bw()
+# prov_min_5_agg_2 %>% 
+#   ggplot(aes(x = theta_prov, y = theta_dpt, fill = sum)) +
+#   geom_tile() +
+#   scale_fill_viridis(
+#     option = "inferno",
+#     direction = -1, 
+#     trans = log_trans()
+#   ) +
+#   theme_bw()
 
 
 # Plotting the Clusters  ---------------------------------------------------------------------------

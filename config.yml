@@ -31,15 +31,17 @@ default:
 sensitivity:
   sbatch:
     wd: "/homes/hchacont/repos/MPH_thesis/"
+    output_dir: "/homes/hchacont/Runs/"
     threads: 1
     user: "hchacont"
     memory: "1G"
     time: "00:20:00"
+    memory_agg: "20G"
   mrbrt:
-    spline_degree: 3
-    spline_knots_type: "frequency"
+    spline_degree: 2
+    spline_knots_type: "domain"
     prior_spline_maxder_gaussian: !expr array(c(0, 0.03))
-    spline_knots: !expr array(c(seq(0, 1, by = 0.1)))
+    spline_knots: !expr array(c(seq(0, 1, by = 0.05)))
   cascade:
     output: "output/"
     dpt_label: "mrbrt_cascade_dpt"
@@ -57,6 +59,10 @@ sensitivity:
     prediction: FALSE
     prediction_dir: "data/pre_processed/pred_prov_time_series.csv"
   sensitivity:
+    theta_dpt:  !expr seq(1,40, 1)
+    theta_prov: !expr seq(1,40, 1)
+    condition1: 1.2
+    condition2: 1.5
     output: "sensitivity/models"
     
 validation_run:

@@ -5,22 +5,21 @@ library(ggplot2)
 library(reticulate)
 library(ggpubr)
 library(cowplot)
-library(data.table)
 library(tidyr)
 library(dplyr)
 reticulate::use_python("/ihme/code/mscm/miniconda3/envs/mrtool_0.0.1/bin/python")
 cw <- reticulate::import("crosswalk")
 mr <- reticulate::import("mrtool")
-config <- config::get(config = "sensitivity")
+config <- config::get(file = config_loc, config = "sensitivity")
 library(mrbrt003, lib.loc = "/ihme/code/mscm/Rv4/dev_packages/")
 
 # Loading and Formatting the data -----------------------------------------
 
 # Death count per day dataset
-death_count_day <- fread("data/pre_processed/death_count_prov_day.csv")
+death_count_day <- fread(paste0(config$sbatch$wd,"data/pre_processed/death_count_prov_day.csv"))
 
 # Province level population
-poblacion_prov <- fread("data/pre_processed/poblacion_prov.csv")
+poblacion_prov <- fread(paste0(config$sbatch$wd,"data/pre_processed/poblacion_prov.csv"))
 
 # Province level death counts
 data_prov <- (
@@ -96,20 +95,21 @@ mod_nat <- mr$MRBRT(
 mod_nat$fit_model(inner_print_level = 5L, inner_max_iter = 1000L)
 
 # Save sensitivity national model
-py_save_object(mod_nat, "sensitivity/mod_nat.pickle", pickle = "dill")
-saveRDS(data_prov, "sensitivity/data_prov.rds")
+py_save_object(mod_nat, paste0(output_dir,"/", "sensitivity/mod_nat.pickle"), pickle = "dill")
+saveRDS(data_prov, paste0(output_dir,"/","sensitivity/data_prov.rds"))
 
 # Cascade splines Prov --------------------------------------------------------
 
-theta_dpt <- 1:50
-theta_prov <- 1:50
+theta_dpt <- config$sensitivity$theta_dpt
+theta_prov <- config$sensitivity$theta_prov
 prev_batch_job_ids <- NULL
+job_ids <- c() 
 
 for (i in theta_dpt) {
   current_batch_job_ids <- c() # Initialize for the current batch of i
   
   for (j in theta_prov) {
-    args <- c(i, j) 
+    args <- c(i, j, output_dir, config_loc) 
     rscript <- paste0(getwd(), "/src/XX_Run_Thetas.R") 
     rshell <- "/ihme/singularity-images/rstudio/shells/execRscript.sh -s"
     jobname <- paste0("mrbrtcovid_pipeline_dpt_", i, "prov", j)
@@ -117,7 +117,7 @@ for (i in theta_dpt) {
     sys.sub <- paste0(
       "sbatch --parsable -A proj_lsae ", 
       " -J ", jobname,
-      " -o ", "/homes/hchacont/logs/%x.o%j",
+      " -o ", paste0(output_dir,"/logs/","%x_o%j",".txt"),
       " -c ", config$sbatch$threads, 
       " --mem ", config$sbatch$memory,
       " -t ", config$sbatch$time, 
@@ -134,10 +134,10 @@ for (i in theta_dpt) {
     print(paste("Submitting job (Prov =", j, "; Dpt =", i,"):", command))
     # Launch job and capture job ID
     job_id <- system(command, intern = TRUE)
+    job_ids <- c(job_ids, job_id) # Store job ID in the array
     current_batch_job_ids <- c(current_batch_job_ids, job_id) # Store job ID
   }
   
   # Update previous batch job IDs for the next iteration
   prev_batch_job_ids <- current_batch_job_ids
 }
-
