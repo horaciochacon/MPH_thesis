@@ -27,44 +27,7 @@ default:
     prediction_dir: "data/pre_processed/pred_prov_time_series.csv"
   sensitivity:
     output: "sensitivity/models"
-    
-sensitivity:
-  sbatch:
-    wd: "/homes/hchacont/repos/MPH_thesis/"
-    output_dir: "/homes/hchacont/Runs/"
-    threads: 1
-    user: "hchacont"
-    memory: "1G"
-    time: "00:20:00"
-    memory_agg: "20G"
-  mrbrt:
-    spline_degree: 2
-    spline_knots_type: "domain"
-    prior_spline_maxder_gaussian: !expr array(c(0, 0.03))
-    spline_knots: !expr array(c(seq(0, 1, by = 0.05)))
-  cascade:
-    output: "output/"
-    dpt_label: "mrbrt_cascade_dpt"
-    prov_label: "mrbrt_cascade_prov"
-    theta_dpt: 12
-    theta_prov: 15
-  pred:
-    res: 1
-    depts: !expr unique(utils::read.csv("data/pre_processed/poblacion_prov.csv")[,1])
-    provs: !expr unique(utils::read.csv("data/pre_processed/poblacion_prov.csv")[,2])
-  save:
-    plots: FALSE
-    plot_dir: "plots/test/"
-    plots_format: ".png"
-    prediction: FALSE
-    prediction_dir: "data/pre_processed/pred_prov_time_series.csv"
-  sensitivity:
-    theta_dpt:  !expr seq(1,40, 1)
-    theta_prov: !expr seq(1,40, 1)
-    condition1: 1.2
-    condition2: 1.5
-    output: "sensitivity/models"
-    
+
 validation_run:
   sbatch:
     wd: "/homes/hchacont/repos/MPH_thesis/"
@@ -93,4 +56,39 @@ validation_run:
     prediction: FALSE
     prediction_dir: "data/pre_processed/pred_prov_time_series.csv"
   sensitivity:
+    output: "sensitivity/models"    
+    
+sensitivity:
+  sbatch:
+    wd: "/homes/hchacont/repos/MPH_thesis/"
+    output_dir: "/ihme/scratch/users/hchacont/mrbrtcovid/runs/"
+    threads: 1
+    user: "hchacont"
+    memory: "1G"
+    time: "00:20:00"
+    memory_agg: "20G"
+  mrbrt:
+    spline_degree: 3
+    spline_knots_type: "domain"
+    prior_spline_maxder_gaussian: !expr array(c(0, 0.02))
+    spline_knots: !expr array(c(seq(0, 1, by = 0.1)))
+  cascade:
+    output: "output/"
+    dpt_label: "mrbrt_cascade_dpt"
+    prov_label: "mrbrt_cascade_prov"
+  pred:
+    res: 1
+    depts: !expr unique(utils::read.csv("data/pre_processed/poblacion_prov.csv")[,1])
+    provs: !expr unique(utils::read.csv("data/pre_processed/poblacion_prov.csv")[,2])
+  save:
+    plots: FALSE
+    plot_dir: "plots/test/"
+    plots_format: ".png"
+    prediction: FALSE
+    prediction_dir: "data/pre_processed/pred_prov_time_series.csv"
+  sensitivity:
+    theta_dpt:  !expr seq(1,30, 1)
+    theta_prov: !expr seq(1,30, 1)
+    condition1: 1.2
+    condition2: 1.5
     output: "sensitivity/models"

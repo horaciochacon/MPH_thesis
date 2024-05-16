@@ -2,7 +2,39 @@ library(data.table)
 library(tidyverse)
 
 
+# Create Run directory structure --------------------------------------------------------------
+
+create_directories <- function(output_dir) {
+  message(output_dir)
+  dir.create(output_dir, showWarnings = FALSE)
+  
+  # Define the directory structure
+  dirs <- c(
+    "logs", "MR_BRT/models", "MR_BRT/models/cascade",
+    "MR_BRT/output", "estimates/predicted_we",
+    "estimates/best_theta", "plots/heatmaps",
+    "plots/epidemic_curves/wave1", "plots/epidemic_curves/wave2",
+    "plots/epidemic_curves/combined", "plots/epidemic_curves/combined_k1",
+    "plots/epidemic_curves/combined_k2", "plots/epidemic_curves/grid_plots",
+    "plots/epidemic_curves/grid_plots_k1", "plots/epidemic_curves/grid_plots_k2"
+  )
+  
+  # Create directories iteratively
+  for (dir in dirs) {
+    dir.create(file.path(output_dir, dir), showWarnings = FALSE, recursive = TRUE)
+  }
+}
+
 # Sensitivity Prediction Plots ----------------------------------------------------------------
+
+# Calculate the maximum y_hat for each department
+max_y_hat_dept <- function(prov_pred_best_k1, prov_pred_best_k2) {
+  rbind(
+    prov_pred_best_k1[, .(max_y_hat = max(exp(y_hat) * 100000, na.rm = TRUE)), by = dpt_cdc],
+    prov_pred_best_k2[, .(max_y_hat = max(exp(y_hat) * 100000, na.rm = TRUE)), by = dpt_cdc]
+  )[, .(max_y_hat = max(max_y_hat, na.rm = TRUE)), by = dpt_cdc]
+}
+
 
 add_config_caption <- function(config) {
   labs(
@@ -152,7 +184,7 @@ plot_prov_data_k2 <- function(prov_id, data_prov, prov_pred_best_k1, prov_pred_m
 
 plot_prov_data_combined <- function(prov_id, data_prov, prov_pred_best_k1, prov_pred_min_k1, 
                               merged_k1, best_k1_theta, prov_pred_best_k2, prov_pred_min_k2, 
-                              merged_k2, best_k2_theta, waves) {
+                              merged_k2, best_k2_theta, waves, max_dpt) {
   
   ggplot() +
     geom_point(aes(x = x1, y = y1), data = data_prov[data_prov$prov_cdc == prov_id]) +
@@ -228,7 +260,14 @@ plot_prov_data_combined <- function(prov_id, data_prov, prov_pred_best_k1, prov_
       y = "Mortality per 100,000",
       color = "Model"
     ) +
-    ylim(c(0, quantile(data_prov[dpt_cdc == data_prov[prov_cdc == prov_id][1,1]]$y1, 0.975)) *1.5) +
+    ylim(
+      c(
+        0, 
+        max_dpt[dpt_cdc == unique(
+          prov_pred_best_k1[prov_pred_best_k1$prov_cdc == prov_id]$dpt_cdc
+          )]$max_y_hat
+        )
+      ) +
     theme_bw() +
     theme(
       legend.position = "bottom",
@@ -238,7 +277,7 @@ plot_prov_data_combined <- function(prov_id, data_prov, prov_pred_best_k1, prov_
 }
 
 plot_prov_data_combined_k1 <- function(prov_id, data_prov, prov_pred_best_k1, prov_pred_min_k1, 
-                              merged_k1, waves, best_k1_theta) {
+                              merged_k1, waves, best_k1_theta, max_dpt) {
   
   ggplot() +
     geom_point(aes(x = x1, y = y1), data = data_prov[data_prov$prov_cdc == prov_id]) +
@@ -289,7 +328,14 @@ plot_prov_data_combined_k1 <- function(prov_id, data_prov, prov_pred_best_k1, pr
       y = "Mortality per 100,000",
       color = NULL
     ) +
-    ylim(c(0, quantile(data_prov[dpt_cdc == data_prov[prov_cdc == prov_id][1,1]]$y1, 0.975)) *1.5) +
+    ylim(
+      c(
+        0, 
+        max_dpt[dpt_cdc == unique(
+          prov_pred_best_k1[prov_pred_best_k1$prov_cdc == prov_id]$dpt_cdc
+        )]$max_y_hat
+      )
+    ) +
     theme_bw() +
     theme(
       legend.position = "bottom",
@@ -299,7 +345,7 @@ plot_prov_data_combined_k1 <- function(prov_id, data_prov, prov_pred_best_k1, pr
 }
 
 plot_prov_data_combined_k2 <- function(prov_id, data_prov, prov_pred_best_k2, prov_pred_min_k2, 
-                                       merged_k2, waves, best_k2_theta) {
+                                       merged_k2, waves, best_k2_theta, max_dpt) {
   
   ggplot() +
     geom_point(aes(x = x1, y = y1), data = data_prov[data_prov$prov_cdc == prov_id]) +
@@ -350,7 +396,14 @@ plot_prov_data_combined_k2 <- function(prov_id, data_prov, prov_pred_best_k2, pr
       y = "Mortality per 100,000",
       color = NULL
     ) +
-    ylim(c(0, quantile(data_prov[dpt_cdc == data_prov[prov_cdc == prov_id][1,1]]$y1, 0.975)) *1.5) +
+    ylim(
+      c(
+        0, 
+        max_dpt[dpt_cdc == unique(
+          prov_pred_best_k2[prov_pred_best_k2$prov_cdc == prov_id]$dpt_cdc
+        )]$max_y_hat
+      )
+    ) +
     theme_bw() +
     theme(
       legend.position = "bottom",
@@ -440,6 +493,9 @@ best_dpt_pred <- function(data, best_theta, pob_dpt){
   
   
 }
+
+
+# Timestamp -----------------------------------------------------------------------------------
 
 make_time_stamp <- function() {
   run_date <- gsub("-", "_", Sys.time())
