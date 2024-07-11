@@ -74,6 +74,7 @@ job_id_agg <- system(command, intern = TRUE)
 
 rscript <- paste0(config$sbatch$wd, "src/sensitivity/4_sensitivity_best.R")
 jobname <- "best_theta"
+rshell <- "/ihme/singularity-images/rstudio/shells/execRscript.sh -s"
 args <- c(output_dir, config_loc)
 
 sys.sub <- paste0(
@@ -104,8 +105,8 @@ sys.sub <- paste0(
   " -c ", config$sbatch$threads,
   " --mem ", config$sbatch$memory_agg,
   " -t ", config$sbatch$time,
-  " -p all.q"
-  # " --dependency=afterok:", paste(job_id_best, collapse = ":")
+  " -p all.q",
+  " --dependency=afterok:", paste(job_id_best, collapse = ":")
 )
 
 command <- paste(sys.sub, rshell, rscript, paste(args, collapse = " "))

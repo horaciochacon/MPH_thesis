@@ -13,6 +13,7 @@ create_directories <- function(output_dir) {
     "logs", "MR_BRT/models", "MR_BRT/models/cascade",
     "MR_BRT/output", "estimates/predicted_we",
     "estimates/best_theta", "plots/heatmaps",
+    "plots/mrbrt_predictions",
     "plots/epidemic_curves/wave1", "plots/epidemic_curves/wave2",
     "plots/epidemic_curves/combined", "plots/epidemic_curves/combined_k1",
     "plots/epidemic_curves/combined_k2", "plots/epidemic_curves/grid_plots",
@@ -34,6 +35,15 @@ max_y_hat_dept <- function(prov_pred_best_k1, prov_pred_best_k2) {
     prov_pred_best_k2[, .(max_y_hat = max(exp(y_hat) * 100000, na.rm = TRUE)), by = dpt_cdc]
   )[, .(max_y_hat = max(max_y_hat, na.rm = TRUE)), by = dpt_cdc]
 }
+
+
+max_y_hat_dept2 <- function(data_pred, data_obs) {
+  rbind(
+    data_pred[, .(max_y_hat = max(exp(y_hat) * 1e5, na.rm = TRUE)), by = dpt_cdc],
+    data_obs[, .(max_y_hat = max(y1)), by = dpt_cdc]
+  )[, .(max_y_hat = max(max_y_hat, na.rm = TRUE)), by = dpt_cdc]
+}
+
 
 
 add_config_caption <- function(config) {
@@ -412,6 +422,105 @@ plot_prov_data_combined_k2 <- function(prov_id, data_prov, prov_pred_best_k2, pr
     )
 }
 
+
+plot_agg_sens <- function(prov, data_pred, data_obs, max_dpt) {
+  ggplot(data = data_pred[prov_cdc == prov,]) +
+    geom_point(
+      aes(x = x1, y = y1), data = data_obs[prov_cdc == prov,],
+      size = 1, alpha = 0.65
+    ) +
+    geom_line(aes(x = x1, y = exp(y_hat) * 1e5, col = conf), linewidth = 1, alpha = 0.9) +
+    labs(
+      title = paste(
+        unique(data_pred[data_pred$prov_cdc == prov]$dpt_cdc),
+        "-",
+        prov
+        ),
+      x = "Week", 
+      y = "Mortality per 100,000",
+      col = NULL
+    ) +
+    theme_bw() +
+    ylim(c(0, max_dpt[prov_cdc == prov,]$max_y_hat)) +
+    theme(
+      legend.position = "bottom",
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5)
+    )
+}
+
+plot_agg_sens_facet <- function(prov, data_pred, data_obs, facet = "knots") {
+  
+  if (facet == "knots") {
+    ggplot(data = data_pred[prov_cdc == prov,]) +
+      geom_point(
+        aes(x = x1, y = y1), data = data_obs[prov_cdc == prov,],
+        size = 1, alpha = 0.65
+      ) +
+      geom_line(
+        aes(x = x1, y = exp(y_hat) * 1e5, col = paste0(spline_degree)), 
+        linewidth = 1, alpha = 0.9
+      ) +
+      labs(
+        title = prov,
+        x = "Week", 
+        y = "Mortality per 100,000",
+        col = "Spline Degree"
+      ) +
+      facet_wrap(.~paste0("Knots:", spline_knots)) +
+      theme_bw() +
+      ylim(c(0, ifelse(
+        max(data_obs[prov_cdc == prov,]$y1, na.rm = TRUE) < 
+          (exp(max(data_pred[prov_cdc == prov,]$y_hat, na.rm = TRUE)) * 1e5),
+        max(data_obs[prov_cdc == prov,]$y1, na.rm = TRUE) * 1.2,
+        (exp(max(data_pred[prov_cdc == prov,]$y_hat, na.rm = TRUE)) * 1e5) * 1.2
+      )
+      )
+      ) +
+      theme(
+        legend.position = "bottom",
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)
+      )
+  } else if (facet == "degree") {
+    ggplot(data = data_pred[prov_cdc == prov,]) +
+      geom_point(
+        aes(x = x1, y = y1), data = data_obs[prov_cdc == prov,],
+        size = 1, alpha = 0.65
+      ) +
+      geom_line(
+        aes(x = x1, y = exp(y_hat) * 1e5, col = paste0(spline_knots)), 
+        linewidth = 1, alpha = 0.9
+      ) +
+      labs(
+        title = prov,
+        x = "Week", 
+        y = "Mortality per 100,000",
+        col = "Spline Knots"
+      ) +
+      ylim(c(0, ifelse(
+        max(data_obs[prov_cdc == prov,]$y1, na.rm = TRUE) < 
+          (exp(max(data_pred[prov_cdc == prov,]$y_hat, na.rm = TRUE)) * 1e5),
+        max(data_obs[prov_cdc == prov,]$y1, na.rm = TRUE) * 1.2,
+        (exp(max(data_pred[prov_cdc == prov,]$y_hat, na.rm = TRUE)) * 1e5) * 1.2
+      )
+      )
+      ) +
+      facet_wrap(.~paste0("Spline Degree:", spline_degree)) +
+      theme_bw() +
+      theme(
+        legend.position = "bottom",
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)
+      )
+  }
+}
+
+
+
+
+
+
 # List of Best and Minimum Predictions -----------------------------------------------------------
 
 best_min_pred <- function(data, best_k1_theta, lowest_k1_we_kij, best_k2_theta, lowest_k2_we_kij){
@@ -504,3 +613,42 @@ make_time_stamp <- function() {
   
   return(run_date)
 }
+
+
+# sbatch --------------------------------------------------------------------------------------
+
+
+send_job <- function(config, jobname, output_dir, config_loc, rshell, rscript_rel_path, args,
+                     job_ids = NULL) {
+  # Construct the path to the R script
+  rscript <- paste0(config$sbatch$wd, rscript_rel_path)
+  
+  # Set the arguments
+  args <- c(output_dir, config_loc)
+  
+  # Create the system submission command
+  sys.sub <- paste0(
+    "sbatch --parsable -A proj_lsae ",
+    " -J ", jobname,
+    " -o ", paste0(output_dir, "/logs/", "%x.o%j", ".txt"),
+    " -c ", config$sbatch$threads,
+    " --mem ", config$sbatch$memory_agg,
+    " -t ", config$sbatch$time,
+    " -p all.q"
+  )
+  
+  # Add dependency if job_ids are provided
+  if (!is.null(job_ids) && length(job_ids) > 0) {
+    sys.sub <- paste0(sys.sub, " --dependency=afterok:", paste(job_ids, collapse = ":"))
+  }
+  
+  # Construct the full command
+  command <- paste(sys.sub, rshell, rscript, paste(args, collapse = " "))
+  
+  # Execute the command and capture the job ID
+  job_id_agg <- system(command, intern = TRUE)
+  
+  # Return the job ID
+  return(job_id_agg)
+}
+
