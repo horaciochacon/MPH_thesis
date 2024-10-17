@@ -12,6 +12,5 @@ output/prediction_thetas.csv
 output/mrbrt_cascade_dpt
 output/mrbrt_cascade_dpto_peru
 output/mrbrt_cascade_prov
-sensitivity
 temp
 Livecoding.R
