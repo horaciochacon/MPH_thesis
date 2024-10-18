@@ -52,7 +52,7 @@ data_prov <- (
   [, .(n = sum(n)), by = .(fecha_fallecimiento, dpt_cdc, prov_cdc) ]
   [ poblacion_prov[, 2:5], on = .(prov_cdc) ]
   [, y1 := n / pob ]
-  [, x1 := (as.numeric(fecha_fallecimiento) - 18323) / 7 ]
+  [, x1 := as.numeric((fecha_fallecimiento - ymd("2020-03-02")) / 7 )]
   [, sd := sqrt((y1 * (1 - y1)) / pob) ]
   [, ylog := cw$utils$linear_to_log(mean = array(y1), sd = array(sd))[[1]]]
   [, sdlog := cw$utils$linear_to_log(mean = array(y1), sd = array(sd))[[2]]]
@@ -87,58 +87,101 @@ data_prov <- data_prov %>%
   ) %>% 
   fill(id_dpt, .direction = "up")
 
-# MR-BRT Model ---------------------------------------------------------------
 
-# Load data in MRData object
-nat_mrbrt <- mr$MRData()
-nat_mrbrt$load_df(
-  data = data_prov,
-  col_obs = "ylog",
-  col_obs_se = "sdlog",
-  col_covs = list("x1"),
-  col_study_id = "id"
-)
+# k-fold splitting --------------------------------------------------------
 
-# Create MRBRT model and configure covariates
-mod_nat <- mr$MRBRT(
-  data = nat_mrbrt,
-  cov_models = list(
-    mr$LinearCovModel("intercept", use_re = FALSE),
-    mr$LinearCovModel(
-      alt_cov = "x1",
-      use_spline = TRUE,
-      spline_knots = config$mrbrt$spline_knots,
-      spline_degree = config$mrbrt$spline_degree,
-      spline_knots_type = config$mrbrt$spline_knots_type,
-      prior_spline_maxder_gaussian = config$mrbrt$prior_spline_maxder_gaussian
+# Define the number of folds
+k_folds <- config$sensitivity$k_folds  # Or set this value based on your config
+
+# Assign fold IDs to each data point within each province
+set.seed(1)  # Set a seed for reproducibility
+data_prov <- data_prov %>%
+  group_by(prov_cdc) %>%
+  mutate(
+    n_points = n(),  # Number of data points in the province
+    n_folds = min(k_folds, n_points)  # Adjust number of folds if necessary
+  ) %>%
+  arrange(sample(n())) %>%  # Randomly shuffle data within the province
+  mutate(
+    fold = ((row_number() - 1) %% n_folds) + 1  # Assign fold numbers evenly
+  ) %>%
+  ungroup() %>%
+  select(-n_points, -n_folds) 
+
+# MR-BRT Model Dpt Model ---------------------------------------------------------------
+
+dpts <- config$pred$depts
+
+for (dpt in dpts) {
+  
+  data_dpt <- data_prov %>% filter(dpt_cdc == dpt)
+  
+  # Load data in MRData object
+  dpt_mrbrt <- mr$MRData()
+  dpt_mrbrt$load_df(
+    data = data_dpt,
+    col_obs = "ylog",
+    col_obs_se = "sdlog",
+    col_covs = list("x1"),
+    col_study_id = "id"
+  )
+  
+  # Create MRBRT model and configure covariates
+  mod_dpt <- mr$MRBRT(
+    data = dpt_mrbrt,
+    cov_models = list(
+      mr$LinearCovModel("intercept", use_re = FALSE),
+      mr$LinearCovModel(
+        alt_cov = "x1",
+        use_spline = TRUE,
+        spline_knots = config$mrbrt$spline_knots,
+        spline_degree = config$mrbrt$spline_degree,
+        spline_knots_type = config$mrbrt$spline_knots_type,
+        prior_spline_maxder_gaussian = config$mrbrt$prior_spline_maxder_gaussian
+      )
     )
   )
-)
-
-# Fit MRBRT model
-mod_nat$fit_model(inner_print_level = 5L, inner_max_iter = 1000L)
-
-# Save sensitivity national model
-py_save_object(mod_nat, paste0(output_dir,"/", "MR_BRT/models/mod_nat.pickle"), pickle = "dill")
-saveRDS(data_prov, paste0(output_dir,"/","MR_BRT/models/data_prov.rds"))
+  
+  # Fit MRBRT model
+  mod_dpt$fit_model(inner_print_level = 5L, inner_max_iter = 1000L)
+  
+  # Save sensitivity national model
+  py_save_object(
+    mod_dpt, 
+    paste0(output_dir,"/", "MR_BRT/models/mod_", dpt, ".pickle"), 
+    pickle = "dill"
+    )
+  saveRDS(data_prov, paste0(output_dir,"/","MR_BRT/models/data_prov.rds"))
+}
 
 # Cascade splines Prov --------------------------------------------------------
 
-dpts <- config$pred$depts
+provs <- config$pred$provs
 theta_prov <- config$sensitivity$theta_prov
 prev_batch_job_ids <- NULL
 job_ids <- c() 
 
-for (i in dpts) {
-  current_batch_job_ids <- c() # Initialize for the current batch of i
+# Create all combinations of provs and theta_prov
+all_combinations <- expand.grid(prov = provs, theta = theta_prov)
+batch_size <- 40
+
+# Split combinations into batches
+batches <- split(all_combinations, ceiling(seq_along(all_combinations$prov) / batch_size))
+
+
+for (batch in batches) {
+  current_batch_job_ids <- c()
   
-  for (j in theta_prov) {
+  for (row in 1:nrow(batch)) {
+    i <- batch$prov[row]
+    j <- batch$theta[row]
+    
     # Replace spaces with underscores for job name
     i_clean <- gsub(" ", "_", i)
     jobname <- paste0("mrbrtcovid_pipeline_dpt_", i_clean, "prov", j)
     
     # Construct arguments as a single quoted string
-    args <- sprintf("'%s' %s '%s' '%s'", i, j, output_dir, config_loc)
+    args <- sprintf("'%s' %s %s '%s' '%s'", i, j, k_folds, output_dir, config_loc)
     rscript <- shQuote(paste0(getwd(), "/src/sensitivity/2_run_thetas.R"))
     singularity <- "-i /ihme/singularity-images/rstudio/ihme_rstudio_4222.img"
     rshell <- paste0("/ihme/singularity-images/rstudio/shells/execRscript.sh ", singularity, " -s")
@@ -168,16 +211,7 @@ for (i in dpts) {
     
     # Launch job and capture job ID
     job_id <- system(command, intern = TRUE)
-    job_ids <- c(job_ids, job_id) # Store job ID in the array
-    current_batch_job_ids <- c(current_batch_job_ids, job_id) # Store job ID
-    
-    # Debugging prints
-    print("Constructed command:")
-    print(command)
-    print("Arguments passed to the R script:")
-    print(args)
-    print("Current batch job IDs:")
-    print(current_batch_job_ids)
+    current_batch_job_ids <- c(current_batch_job_ids, job_id)
   }
   
   # Update previous batch job IDs for the next iteration
